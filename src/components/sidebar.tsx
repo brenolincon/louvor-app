@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   CalendarDays,
@@ -8,7 +9,9 @@ import {
   Users,
   ClipboardCheck,
   Settings,
+  X,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -19,30 +22,67 @@ const navItems = [
   { href: "/configuracoes", label: "Configurações", icon: Settings },
 ];
 
-export function Sidebar() {
+type SidebarProps = {
+  open?: boolean;
+  onClose?: () => void;
+};
+
+export function Sidebar({ open = false, onClose }: SidebarProps) {
+  const pathname = usePathname();
+
   return (
-    <aside className="hidden min-h-screen w-72 border-r border-zinc-800 bg-zinc-950 p-5 lg:block">
-      <div className="mb-10">
-        <div className="text-xl font-bold text-white">Louvor App</div>
-        <div className="text-sm text-zinc-500">Gestão ministerial</div>
-      </div>
+    <>
+      {open && (
+        <div
+          onClick={onClose}
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
+        />
+      )}
 
-      <nav className="space-y-2">
-        {navItems.map((item) => {
-          const Icon = item.icon;
+      <aside
+        className={cn(
+          "fixed left-0 top-0 z-50 h-screen w-72 border-r border-zinc-800 bg-zinc-950 p-5 transition-transform lg:static lg:translate-x-0",
+          open ? "translate-x-0" : "-translate-x-full",
+        )}
+      >
+        <div className="mb-10 flex items-start justify-between">
+          <div>
+            <div className="text-xl font-bold text-white">Louvor App</div>
+            <div className="text-sm text-zinc-500">Gestão ministerial</div>
+          </div>
 
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm text-zinc-400 transition hover:bg-zinc-900 hover:text-white"
-            >
-              <Icon size={18} />
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
-    </aside>
+          <button
+            onClick={onClose}
+            className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-900 hover:text-white lg:hidden"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        <nav className="space-y-2">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const active = pathname.startsWith(item.href);
+
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={onClose}
+                className={cn(
+                  "flex items-center gap-3 rounded-xl px-4 py-3 text-sm transition",
+                  active
+                    ? "bg-violet-600 text-white"
+                    : "text-zinc-400 hover:bg-zinc-900 hover:text-white",
+                )}
+              >
+                <Icon size={18} />
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+      </aside>
+    </>
   );
 }

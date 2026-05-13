@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { LogOut } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { AppLayout } from "@/components/app-layout";
 import { Card } from "@/components/ui/card";
@@ -16,12 +17,34 @@ type Profile = {
   instrument: string | null;
 };
 
+const statusLabels: Record<string, string> = {
+  pending: "Aguardando aprovação",
+  approved: "Aprovado",
+  rejected: "Recusado",
+  inactive: "Inativo",
+  training: "Em treinamento",
+};
+
+const memberTypeLabels: Record<string, string> = {
+  vocalist: "Vocal",
+  instrumentalist: "Instrumentista",
+};
+
+const vocalGroupLabels: Record<string, string> = {
+  unit: "Unit",
+  ative: "Ative",
+  teens: "Geração Teens",
+};
+
 export default function DashboardPage() {
   const router = useRouter();
+
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<Profile | null>(null);
 
   useEffect(() => {
+    let isMounted = true;
+
     async function loadUser() {
       const { data } = await supabase.auth.getSession();
       const user = data.session?.user;
@@ -37,11 +60,17 @@ export default function DashboardPage() {
         .eq("id", user.id)
         .single();
 
+      if (!isMounted) return;
+
       setProfile(profileData);
       setLoading(false);
     }
 
     loadUser();
+
+    return () => {
+      isMounted = false;
+    };
   }, [router]);
 
   async function handleLogout() {
@@ -57,34 +86,53 @@ export default function DashboardPage() {
     );
   }
 
+  const displayType = profile?.member_type
+    ? memberTypeLabels[profile.member_type] || profile.member_type
+    : "-";
+
+  const displayGroupOrInstrument = profile?.vocal_group
+    ? vocalGroupLabels[profile.vocal_group] || profile.vocal_group
+    : profile?.instrument || "-";
+
   return (
     <AppLayout>
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Dashboard</h1>
-          <p className="text-zinc-400">Bem-vindo, {profile?.full_name}</p>
+          <h1 className="text-3xl font-bold sm:text-4xl">Dashboard</h1>
+          <p className="mt-1 text-zinc-400">Bem-vindo, {profile?.full_name}</p>
         </div>
 
-        <Button variant="secondary" onClick={handleLogout}>
-          Sair
+        <Button
+          variant="danger"
+          onClick={handleLogout}
+          className="w-full sm:w-auto"
+        >
+          <span className="flex items-center justify-center gap-2">
+            <LogOut size={18} />
+            Sair
+          </span>
         </Button>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <p className="text-sm text-zinc-500">Status ministerial</p>
-          <h2 className="mt-2 text-2xl font-bold">{profile?.status}</h2>
+          <h2 className="mt-2 text-xl font-bold sm:text-2xl">
+            {profile?.status
+              ? statusLabels[profile.status] || profile.status
+              : "-"}
+          </h2>
         </Card>
 
         <Card>
-          <p className="text-sm text-zinc-500">Tipo</p>
-          <h2 className="mt-2 text-2xl font-bold">{profile?.member_type}</h2>
+          <p className="text-sm text-zinc-500">Tipo de integrante</p>
+          <h2 className="mt-2 text-xl font-bold sm:text-2xl">{displayType}</h2>
         </Card>
 
         <Card>
           <p className="text-sm text-zinc-500">Grupo / Instrumento</p>
-          <h2 className="mt-2 text-2xl font-bold">
-            {profile?.vocal_group || profile?.instrument || "-"}
+          <h2 className="mt-2 text-xl font-bold sm:text-2xl">
+            {displayGroupOrInstrument}
           </h2>
         </Card>
       </div>
