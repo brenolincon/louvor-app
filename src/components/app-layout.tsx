@@ -6,11 +6,17 @@ import { Sidebar } from "@/components/sidebar";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
       <div className="flex">
-        <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+        <Sidebar
+          open={sidebarOpen}
+          collapsed={sidebarCollapsed}
+          onClose={() => setSidebarOpen(false)}
+          onToggleCollapse={() => setSidebarCollapsed((value) => !value)}
+        />
 
         <div className="min-h-screen flex-1">
           <header className="sticky top-0 z-30 flex h-16 items-center border-b border-zinc-800 bg-zinc-950/90 px-4 backdrop-blur lg:hidden">

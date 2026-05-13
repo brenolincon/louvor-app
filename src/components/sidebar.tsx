@@ -10,7 +10,10 @@ import {
   ClipboardCheck,
   Settings,
   X,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
+
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -24,10 +27,17 @@ const navItems = [
 
 type SidebarProps = {
   open?: boolean;
+  collapsed?: boolean;
   onClose?: () => void;
+  onToggleCollapse?: () => void;
 };
 
-export function Sidebar({ open = false, onClose }: SidebarProps) {
+export function Sidebar({
+  open = false,
+  collapsed = false,
+  onClose,
+  onToggleCollapse,
+}: SidebarProps) {
   const pathname = usePathname();
 
   return (
@@ -41,27 +51,51 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
 
       <aside
         className={cn(
-          "fixed left-0 top-0 z-50 h-screen w-72 border-r border-zinc-800 bg-zinc-950 p-5 transition-transform lg:static lg:translate-x-0",
-          open ? "translate-x-0" : "-translate-x-full",
+          "fixed left-0 top-0 z-50 h-screen border-r border-zinc-800 bg-zinc-950 p-5 transition-all duration-300 lg:static lg:translate-x-0",
+          collapsed ? "lg:w-24" : "lg:w-72",
+          open ? "translate-x-0 w-72" : "-translate-x-full w-72",
         )}
       >
         <div className="mb-10 flex items-start justify-between">
-          <div>
-            <div className="text-xl font-bold text-white">Louvor App</div>
-            <div className="text-sm text-zinc-500">Gestão ministerial</div>
-          </div>
+          {!collapsed && (
+            <div>
+              <div className="text-xl font-bold text-white">Louvor App</div>
 
-          <button
-            onClick={onClose}
-            className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-900 hover:text-white lg:hidden"
-          >
-            <X size={20} />
-          </button>
+              <div className="text-sm text-zinc-500">Gestão ministerial</div>
+            </div>
+          )}
+
+          {collapsed && (
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-600 font-bold text-white">
+              L
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            <button
+              onClick={onToggleCollapse}
+              className="hidden rounded-lg p-2 text-zinc-400 transition hover:bg-zinc-900 hover:text-white lg:block"
+            >
+              {collapsed ? (
+                <PanelLeftOpen size={20} />
+              ) : (
+                <PanelLeftClose size={20} />
+              )}
+            </button>
+
+            <button
+              onClick={onClose}
+              className="rounded-lg p-2 text-zinc-400 transition hover:bg-zinc-900 hover:text-white lg:hidden"
+            >
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
         <nav className="space-y-2">
           {navItems.map((item) => {
             const Icon = item.icon;
+
             const active = pathname.startsWith(item.href);
 
             return (
@@ -74,10 +108,12 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
                   active
                     ? "bg-violet-600 text-white"
                     : "text-zinc-400 hover:bg-zinc-900 hover:text-white",
+                  collapsed && "justify-center px-0",
                 )}
               >
-                <Icon size={18} />
-                {item.label}
+                <Icon size={18} className="shrink-0" />
+
+                {!collapsed && <span>{item.label}</span>}
               </Link>
             );
           })}
