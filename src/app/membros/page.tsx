@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { AppLayout } from "@/components/app-layout";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { ConfirmModal } from "@/components/ui/confirm-modal";
 
 type Profile = {
   id: string;
@@ -46,6 +47,9 @@ const vocalGroupLabels: Record<string, string> = {
 export default function MembrosPage() {
   const [members, setMembers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedMember, setSelectedMember] = useState<Profile | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [updating, setUpdating] = useState(false);
 
   async function fetchMembers() {
     const { data, error } = await supabase
@@ -83,18 +87,31 @@ export default function MembrosPage() {
   }, []);
 
   async function updateStatus(memberId: string, status: string) {
+    setUpdating(true);
+
     const { error } = await supabase
       .from("profiles")
       .update({ status })
       .eq("id", memberId);
 
     if (error) {
+      setUpdating(false);
       alert(error.message);
       return;
     }
 
     const updatedMembers = await fetchMembers();
     setMembers(updatedMembers);
+    setUpdating(false);
+  }
+
+  async function deactivateSelectedMember() {
+    if (!selectedMember) return;
+
+    await updateStatus(selectedMember.id, "inactive");
+
+    setModalOpen(false);
+    setSelectedMember(null);
   }
 
   function getMemberDescription(member: Profile) {
@@ -171,31 +188,62 @@ export default function MembrosPage() {
                   </span>
 
                   <div className="flex flex-wrap gap-2">
-                    {member.status !== "training" && (
+                    {member.status === "approved" && (
                       <Button
-                        variant="secondary"
-                        onClick={() => updateStatus(member.id, "training")}
+                        variant="danger"
+                        onClick={() => {
+                          setSelectedMember(member);
+                          setModalOpen(true);
+                        }}
                       >
-                        Treinamento
+                        Excluir membro
                       </Button>
                     )}
 
-                    {member.status !== "approved" && (
+                    {member.status === "inactive" && (
                       <Button
                         onClick={() => updateStatus(member.id, "approved")}
                       >
-                        Aprovar
+                        Reativar
                       </Button>
                     )}
 
-                    {member.status !== "rejected" && (
-                      <Button
-                        variant="danger"
-                        onClick={() => updateStatus(member.id, "rejected")}
-                      >
-                        Recusar
-                      </Button>
-                    )}
+                    {member.status !== "approved" &&
+                      member.status !== "inactive" && (
+                        <>
+                          {member.status !== "training" && (
+                            <Button
+                              variant="secondary"
+                              onClick={() =>
+                                updateStatus(member.id, "training")
+                              }
+                            >
+                              Treinamento
+                            </Button>
+                          )}
+
+                          {member.status !== "approved" && (
+                            <Button
+                              onClick={() =>
+                                updateStatus(member.id, "approved")
+                              }
+                            >
+                              Aprovar
+                            </Button>
+                          )}
+
+                          {member.status !== "rejected" && (
+                            <Button
+                              variant="danger"
+                              onClick={() =>
+                                updateStatus(member.id, "rejected")
+                              }
+                            >
+                              Recusar
+                            </Button>
+                          )}
+                        </>
+                      )}
                   </div>
                 </div>
               </div>
@@ -203,6 +251,19 @@ export default function MembrosPage() {
           ))}
         </div>
       )}
+      <ConfirmModal
+        open={modalOpen}
+        title="Excluir membro?"
+        description={`Tem certeza que deseja remover ${selectedMember?.full_name || "este membro"} dos membros ativos? Ele não aparecerá mais para novas escalas.`}
+        confirmText="Excluir membro"
+        cancelText="Cancelar"
+        loading={updating}
+        onConfirm={deactivateSelectedMember}
+        onCancel={() => {
+          setModalOpen(false);
+          setSelectedMember(null);
+        }}
+      />
     </AppLayout>
   );
 }
