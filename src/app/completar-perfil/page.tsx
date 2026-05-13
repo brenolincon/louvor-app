@@ -2,8 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { UserPlus } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { getProfile } from "@/lib/get-profile";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Card } from "@/components/ui/card";
 
 export default function CompletarPerfilPage() {
   const router = useRouter();
@@ -42,20 +47,21 @@ export default function CompletarPerfilPage() {
     const user = sessionData.session?.user;
 
     if (!user) {
-      alert("Usuário não autenticado.");
       setLoading(false);
+      router.push("/login");
+      return;
+    }
+
+    const existingProfile = await getProfile(user.id);
+
+    if (existingProfile) {
+      setLoading(false);
+      router.push("/dashboard");
       return;
     }
 
     const vocalGroup =
       memberType === "vocalist" ? getVocalGroup(birthDate) : null;
-
-    const existingProfile = await getProfile(user.id);
-
-    if (existingProfile) {
-      router.push("/dashboard");
-      return;
-    }
 
     const { error } = await supabase.from("profiles").insert({
       id: user.id,
@@ -81,74 +87,78 @@ export default function CompletarPerfilPage() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center p-6">
-      <form onSubmit={handleSubmit} className="w-full max-w-md space-y-4">
-        <h1 className="text-2xl font-bold">Completar perfil</h1>
+    <main className="min-h-screen bg-zinc-950 text-white">
+      <div className="flex min-h-screen items-center justify-center p-6">
+        <Card className="w-full max-w-2xl border-zinc-800 bg-zinc-900/80">
+          <div className="mb-8">
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-600">
+              <UserPlus size={24} />
+            </div>
 
-        <input
-          className="w-full border rounded p-3"
-          placeholder="Nome completo"
-          value={fullName}
-          onChange={(e) => setFullName(e.target.value)}
-          required
-        />
+            <h1 className="text-3xl font-bold">Completar perfil</h1>
+            <p className="mt-2 text-sm text-zinc-400">
+              Preencha seus dados ministeriais para solicitar aprovação.
+            </p>
+          </div>
 
-        <input
-          className="w-full border rounded p-3"
-          placeholder="Telefone"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-        />
+          <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-2">
+            <Input
+              placeholder="Nome completo"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              required
+            />
 
-        <input
-          className="w-full border rounded p-3"
-          type="date"
-          value={birthDate}
-          onChange={(e) => setBirthDate(e.target.value)}
-          required
-        />
+            <Input
+              placeholder="Telefone"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+            />
 
-        <select
-          className="w-full border rounded p-3"
-          value={memberType}
-          onChange={(e) => setMemberType(e.target.value)}
-          required
-        >
-          <option value="">Tipo de integrante</option>
-          <option value="vocalist">Cantor</option>
-          <option value="instrumentalist">Instrumentista</option>
-        </select>
+            <Input
+              type="date"
+              value={birthDate}
+              onChange={(e) => setBirthDate(e.target.value)}
+              required
+            />
 
-        {memberType === "vocalist" && (
-          <select
-            className="w-full border rounded p-3"
-            value={vocalRole}
-            onChange={(e) => setVocalRole(e.target.value)}
-            required
-          >
-            <option value="">Função vocal</option>
-            <option value="minister">Ministro</option>
-            <option value="backvocal">Backvocal</option>
-          </select>
-        )}
+            <Select
+              value={memberType}
+              onChange={(e) => setMemberType(e.target.value)}
+              required
+            >
+              <option value="">Tipo de integrante</option>
+              <option value="vocalist">Cantor</option>
+              <option value="instrumentalist">Instrumentista</option>
+            </Select>
 
-        {memberType === "instrumentalist" && (
-          <input
-            className="w-full border rounded p-3"
-            placeholder="Instrumento"
-            value={instrument}
-            onChange={(e) => setInstrument(e.target.value)}
-            required
-          />
-        )}
+            {memberType === "vocalist" && (
+              <Select
+                value={vocalRole}
+                onChange={(e) => setVocalRole(e.target.value)}
+                required
+              >
+                <option value="">Função vocal</option>
+                <option value="minister">Ministro</option>
+                <option value="backvocal">Backvocal</option>
+              </Select>
+            )}
 
-        <button
-          disabled={loading}
-          className="w-full bg-black text-white rounded p-3"
-        >
-          {loading ? "Salvando..." : "Salvar perfil"}
-        </button>
-      </form>
+            {memberType === "instrumentalist" && (
+              <Input
+                placeholder="Instrumento"
+                value={instrument}
+                onChange={(e) => setInstrument(e.target.value)}
+                required
+              />
+            )}
+
+            <Button disabled={loading} className="md:col-span-2">
+              {loading ? "Salvando..." : "Salvar perfil"}
+            </Button>
+          </form>
+        </Card>
+      </div>
     </main>
   );
 }
