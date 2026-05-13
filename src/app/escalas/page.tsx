@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { CalendarDays } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -43,9 +44,11 @@ export default function EscalasPage() {
   const [loading, setLoading] = useState(false);
   const [loadingWeeks, setLoadingWeeks] = useState(true);
 
-  async function loadWeeks() {
-    setLoadingWeeks(true);
+  function formatDateBR(date: string) {
+    return new Date(date + "T00:00:00").toLocaleDateString("pt-BR");
+  }
 
+  async function fetchWeeks() {
     const { data, error } = await supabase
       .from("ministry_weeks")
       .select("*")
@@ -53,16 +56,31 @@ export default function EscalasPage() {
 
     if (error) {
       alert(error.message);
-      setLoadingWeeks(false);
-      return;
+      return [];
     }
 
-    setWeeks(data || []);
-    setLoadingWeeks(false);
+    return data || [];
   }
 
   useEffect(() => {
-    loadWeeks();
+    let isMounted = true;
+
+    async function loadInitialWeeks() {
+      setLoadingWeeks(true);
+
+      const data = await fetchWeeks();
+
+      if (!isMounted) return;
+
+      setWeeks(data);
+      setLoadingWeeks(false);
+    }
+
+    loadInitialWeeks();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   async function createWeek(e: React.FormEvent) {
@@ -99,11 +117,9 @@ export default function EscalasPage() {
 
     setSundayDate("");
     setVocalGroup("");
-    await loadWeeks();
-  }
 
-  function formatDateBR(date: string) {
-    return new Date(date + "T00:00:00").toLocaleDateString("pt-BR");
+    const updatedWeeks = await fetchWeeks();
+    setWeeks(updatedWeeks);
   }
 
   return (
@@ -230,6 +246,13 @@ export default function EscalasPage() {
                     </p>
                   </div>
                 </div>
+
+                <Link
+                  href={`/escalas/${week.id}`}
+                  className="inline-flex rounded-xl bg-violet-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-violet-500"
+                >
+                  Abrir semana
+                </Link>
               </Card>
             ))}
         </div>
