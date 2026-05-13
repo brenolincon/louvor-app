@@ -7,10 +7,19 @@ import { AppLayout } from "@/components/app-layout";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
+type Profile = {
+  id: string;
+  full_name: string;
+  status: string;
+  member_type: string | null;
+  vocal_group: string | null;
+  instrument: string | null;
+};
+
 export default function DashboardPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [profile, setProfile] = useState<any>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
 
   useEffect(() => {
     async function loadUser() {
@@ -53,9 +62,7 @@ export default function DashboardPage() {
       <div className="mb-8 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Dashboard</h1>
-          <p className="text-zinc-400">
-            Bem-vindo, {profile?.full_name}
-          </p>
+          <p className="text-zinc-400">Bem-vindo, {profile?.full_name}</p>
         </div>
 
         <Button variant="secondary" onClick={handleLogout}>
@@ -85,9 +92,7 @@ export default function DashboardPage() {
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
         <Card>
           <h2 className="text-xl font-semibold">Próxima escala</h2>
-          <p className="mt-2 text-zinc-400">
-            Nenhuma escala publicada ainda.
-          </p>
+          <p className="mt-2 text-zinc-400">Nenhuma escala publicada ainda.</p>
         </Card>
 
         <Card>
