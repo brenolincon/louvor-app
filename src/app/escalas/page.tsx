@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CalendarDays } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { AppLayout } from "@/components/app-layout";
@@ -9,10 +9,61 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 
+type MinistryWeek = {
+  id: string;
+  sunday_date: string;
+  wednesday_date: string;
+  rehearsal_date: string;
+  rehearsal_time: string;
+  sunday_time: string;
+  wednesday_time: string;
+  vocal_group: string;
+  status: string;
+  created_at: string;
+};
+
+const vocalGroupLabels: Record<string, string> = {
+  unit: "Unit",
+  ative: "Ative",
+  teens: "Geração Teens",
+};
+
+const statusLabels: Record<string, string> = {
+  draft: "Rascunho",
+  building: "Montando",
+  waiting_repertoire: "Aguardando repertório",
+  waiting_approval: "Aguardando aprovação",
+  published: "Publicada",
+};
+
 export default function EscalasPage() {
   const [sundayDate, setSundayDate] = useState("");
   const [vocalGroup, setVocalGroup] = useState("");
+  const [weeks, setWeeks] = useState<MinistryWeek[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingWeeks, setLoadingWeeks] = useState(true);
+
+  async function loadWeeks() {
+    setLoadingWeeks(true);
+
+    const { data, error } = await supabase
+      .from("ministry_weeks")
+      .select("*")
+      .order("sunday_date", { ascending: false });
+
+    if (error) {
+      alert(error.message);
+      setLoadingWeeks(false);
+      return;
+    }
+
+    setWeeks(data || []);
+    setLoadingWeeks(false);
+  }
+
+  useEffect(() => {
+    loadWeeks();
+  }, []);
 
   async function createWeek(e: React.FormEvent) {
     e.preventDefault();
@@ -46,9 +97,13 @@ export default function EscalasPage() {
       return;
     }
 
-    alert("Semana criada com sucesso!");
     setSundayDate("");
     setVocalGroup("");
+    await loadWeeks();
+  }
+
+  function formatDateBR(date: string) {
+    return new Date(date + "T00:00:00").toLocaleDateString("pt-BR");
   }
 
   return (
@@ -68,7 +123,7 @@ export default function EscalasPage() {
         <Card>
           <h2 className="text-xl font-semibold">Criar semana ministerial</h2>
           <p className="mt-1 text-sm text-zinc-400">
-            O sistema gera automaticamente o ensaio, domingo e quarta.
+            O sistema gera automaticamente ensaio, domingo e quarta.
           </p>
 
           <form onSubmit={createWeek} className="mt-6 space-y-4">
@@ -108,26 +163,76 @@ export default function EscalasPage() {
           </form>
         </Card>
 
-        <Card>
-          <h2 className="text-xl font-semibold">Como funciona</h2>
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold">Semanas criadas</h2>
 
-          <div className="mt-6 space-y-4 text-sm text-zinc-400">
-            <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-4">
-              <strong className="text-white">Ensaio</strong>
-              <p>Sexta-feira anterior às 19:30.</p>
-            </div>
+          {loadingWeeks && (
+            <Card>
+              <p className="text-zinc-400">Carregando semanas...</p>
+            </Card>
+          )}
 
-            <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-4">
-              <strong className="text-white">Domingo</strong>
-              <p>Culto principal às 19:00.</p>
-            </div>
+          {!loadingWeeks && weeks.length === 0 && (
+            <Card>
+              <p className="text-zinc-400">
+                Nenhuma semana ministerial criada ainda.
+              </p>
+            </Card>
+          )}
 
-            <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-4">
-              <strong className="text-white">Quarta</strong>
-              <p>Culto de quarta às 19:30.</p>
-            </div>
-          </div>
-        </Card>
+          {!loadingWeeks &&
+            weeks.map((week) => (
+              <Card key={week.id} className="space-y-4">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold">
+                      Semana {formatDateBR(week.sunday_date)} a{" "}
+                      {formatDateBR(week.wednesday_date)}
+                    </h3>
+
+                    <p className="text-sm text-zinc-400">
+                      Grupo vocal:{" "}
+                      {vocalGroupLabels[week.vocal_group] || week.vocal_group}
+                    </p>
+                  </div>
+
+                  <span className="w-fit rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1 text-xs text-violet-300">
+                    {statusLabels[week.status] || week.status}
+                  </span>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-3">
+                  <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-4">
+                    <p className="text-xs text-zinc-500">Ensaio</p>
+                    <p className="mt-1 font-medium">
+                      {formatDateBR(week.rehearsal_date)}
+                    </p>
+                    <p className="text-sm text-zinc-400">
+                      {week.rehearsal_time}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-4">
+                    <p className="text-xs text-zinc-500">Domingo</p>
+                    <p className="mt-1 font-medium">
+                      {formatDateBR(week.sunday_date)}
+                    </p>
+                    <p className="text-sm text-zinc-400">{week.sunday_time}</p>
+                  </div>
+
+                  <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-4">
+                    <p className="text-xs text-zinc-500">Quarta</p>
+                    <p className="mt-1 font-medium">
+                      {formatDateBR(week.wednesday_date)}
+                    </p>
+                    <p className="text-sm text-zinc-400">
+                      {week.wednesday_time}
+                    </p>
+                  </div>
+                </div>
+              </Card>
+            ))}
+        </div>
       </div>
     </AppLayout>
   );
