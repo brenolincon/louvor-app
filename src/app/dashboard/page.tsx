@@ -1,19 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
+import { AppLayout } from "@/components/app-layout";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 
 export default function DashboardPage() {
   const router = useRouter();
-
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<any>(null);
 
   useEffect(() => {
     async function loadUser() {
       const { data } = await supabase.auth.getSession();
-
       const user = data.session?.user;
 
       if (!user) {
@@ -40,41 +41,62 @@ export default function DashboardPage() {
   }
 
   if (loading) {
-    return <p className="p-6">Carregando...</p>;
+    return (
+      <AppLayout>
+        <p className="text-zinc-400">Carregando...</p>
+      </AppLayout>
+    );
   }
 
   return (
-    <main className="p-6 space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">
-          Olá, {profile?.full_name}
-        </h1>
+    <AppLayout>
+      <div className="mb-8 flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Dashboard</h1>
+          <p className="text-zinc-400">
+            Bem-vindo, {profile?.full_name}
+          </p>
+        </div>
 
-        <button
-          onClick={handleLogout}
-          className="bg-red-500 text-white px-4 py-2 rounded"
-        >
+        <Button variant="secondary" onClick={handleLogout}>
           Sair
-        </button>
+        </Button>
       </div>
 
-      <div className="border rounded p-4">
-        <p>
-          <strong>Status:</strong> {profile?.status}
-        </p>
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card>
+          <p className="text-sm text-zinc-500">Status ministerial</p>
+          <h2 className="mt-2 text-2xl font-bold">{profile?.status}</h2>
+        </Card>
 
-        <p>
-          <strong>Tipo:</strong> {profile?.member_type}
-        </p>
+        <Card>
+          <p className="text-sm text-zinc-500">Tipo</p>
+          <h2 className="mt-2 text-2xl font-bold">{profile?.member_type}</h2>
+        </Card>
 
-        <p>
-          <strong>Grupo vocal:</strong> {profile?.vocal_group || "-"}
-        </p>
-
-        <p>
-          <strong>Instrumento:</strong> {profile?.instrument || "-"}
-        </p>
+        <Card>
+          <p className="text-sm text-zinc-500">Grupo / Instrumento</p>
+          <h2 className="mt-2 text-2xl font-bold">
+            {profile?.vocal_group || profile?.instrument || "-"}
+          </h2>
+        </Card>
       </div>
-    </main>
+
+      <div className="mt-6 grid gap-4 lg:grid-cols-2">
+        <Card>
+          <h2 className="text-xl font-semibold">Próxima escala</h2>
+          <p className="mt-2 text-zinc-400">
+            Nenhuma escala publicada ainda.
+          </p>
+        </Card>
+
+        <Card>
+          <h2 className="text-xl font-semibold">Confirmações</h2>
+          <p className="mt-2 text-zinc-400">
+            Você não possui confirmações pendentes.
+          </p>
+        </Card>
+      </div>
+    </AppLayout>
   );
 }
