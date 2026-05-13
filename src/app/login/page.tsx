@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { getProfile } from "@/lib/get-profile"
 
 export default function LoginPage() {
   const router = useRouter();
@@ -28,7 +29,22 @@ export default function LoginPage() {
       return;
     }
 
-    router.push("/completar-perfil");
+    const { data: sessionData } = await supabase.auth.getSession();
+
+    const user = sessionData.session?.user;
+
+    if (!user) {
+      alert("Usuário não encontrado");
+      return;
+    }
+
+    const profile = await getProfile(user.id);
+
+    if (profile) {
+      router.push("/dashboard");
+    } else {
+      router.push("/completar-perfil");
+    }
   }
 
   return (

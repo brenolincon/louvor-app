@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { getProfile } from "@/lib/get-profile";
 
 export default function CompletarPerfilPage() {
   const router = useRouter();
@@ -48,6 +49,13 @@ export default function CompletarPerfilPage() {
 
     const vocalGroup =
       memberType === "vocalist" ? getVocalGroup(birthDate) : null;
+
+    const existingProfile = await getProfile(user.id);
+
+    if (existingProfile) {
+      router.push("/dashboard");
+      return;
+    }
 
     const { error } = await supabase.from("profiles").insert({
       id: user.id,
