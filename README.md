@@ -1,36 +1,251 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🎵 Louvor App
 
-## Getting Started
+Sistema web para gerenciamento completo de ministério de louvor.
 
-First, run the development server:
+O projeto foi criado para organizar:
+
+* membros
+* escalas
+* ensaios
+* repertórios
+* confirmações
+* aprovações
+* grupos vocais
+* instrumentistas
+
+Tudo em uma plataforma moderna, responsiva e preparada para PWA.
+
+---
+
+# 🚀 Tecnologias
+
+## Frontend
+
+* Next.js 15
+* React
+* TypeScript
+* Tailwind CSS
+
+## Backend / Database
+
+* Supabase
+* PostgreSQL
+* Supabase Auth
+
+## UI
+
+* Lucide Icons
+* Framer Motion (futuro)
+* Sonner (futuro)
+
+---
+
+# 🎯 Objetivo do projeto
+
+Criar um sistema moderno para ministérios de louvor que permita:
+
+* organização de escalas
+* controle de músicos e vocalistas
+* aprovação de repertórios
+* confirmações de presença
+* gerenciamento de ensaios
+* administração ministerial
+
+---
+
+# 🧠 Estrutura ministerial
+
+## Hierarquia
+
+```txt
+Líder Geral
+├── Líderes de Instrumentos
+├── Líderes Vocais
+└── Integrantes
+```
+
+## Grupos vocais
+
+| Grupo         | Idade |
+| ------------- | ----- |
+| Unit          | +30   |
+| Ative         | 18-29 |
+| Geração Teens | 13-17 |
+
+## Cultos padrão
+
+| Evento  | Horário     |
+| ------- | ----------- |
+| Domingo | 19:00       |
+| Quarta  | 19:30       |
+| Ensaio  | Sexta 19:30 |
+
+---
+
+# ✅ Funcionalidades implementadas
+
+## Autenticação
+
+* Cadastro
+* Login
+* Sessão persistente
+* Logout
+
+## Perfil ministerial
+
+* Cadastro de integrante
+* Separação vocal automática por idade
+* Instrumentistas
+* Status ministerial
+
+## Dashboard
+
+* Dashboard responsivo
+* Sidebar colapsável
+* Layout moderno
+* Mobile first
+
+## Escalas
+
+* Criação de semanas ministeriais
+* Geração automática:
+
+  * ensaio
+  * domingo
+  * quarta
+* Página individual da semana
+
+## Membros
+
+* Aprovação de integrantes
+* Treinamento
+* Rejeição
+* Desativação
+* Reativação
+* Modal de confirmação
+
+---
+
+# 🛠️ Estrutura do projeto
+
+```txt
+src/
+├── app/
+├── components/
+├── lib/
+├── types/
+└── utils/
+```
+
+---
+
+# ⚙️ Instalação
+
+## Clone
+
+```bash
+git clone URL_DO_REPOSITORIO
+```
+
+## Instalar dependências
+
+```bash
+npm install
+```
+
+## Rodar projeto
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+# 🔐 Variáveis ambiente
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Criar:
 
-## Learn More
+```txt
+.env.local
+```
 
-To learn more about Next.js, take a look at the following resources:
+Adicionar:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```env
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
+# 📦 Scripts
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Desenvolvimento
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm run dev
+```
+
+## Build
+
+```bash
+npm run build
+```
+
+## Lint
+
+```bash
+npm run lint
+```
+
+---
+
+# 📌 Roadmap
+
+## Próximas funcionalidades
+
+* Sistema de repertórios
+* Aprovação de repertório
+* Escala de instrumentistas
+* Escala de vozes
+* Confirmações de presença
+* Notificações
+* Calendário
+* PWA
+* Push notifications
+* App mobile futuramente
+
+---
+
+# 📱 PWA
+
+O projeto será transformado em:
+
+* Progressive Web App
+* instalável no celular
+* experiência de app nativo
+
+---
+
+# 🎨 UI/UX
+
+Direção visual:
+
+* dark mode
+* minimalista
+* moderna
+* estilo SaaS
+* responsiva
+* mobile first
+
+---
+
+# 👨‍💻 Autor
+
+Desenvolvido por Breno Oliveira.
+
+---
+
+# 📄 Licença
+
+Projeto privado para uso ministerial.
