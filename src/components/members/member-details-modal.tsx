@@ -5,7 +5,6 @@ import { Crown, Save, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
 
 type MemberFunction = {
   id: string;
@@ -56,10 +55,6 @@ export function MemberDetailsModal({
   const [phone, setPhone] = useState("");
   const [birthDate, setBirthDate] = useState("");
 
-  const [leadershipType, setLeadershipType] = useState("");
-  const [leadershipVocalGroup, setLeadershipVocalGroup] = useState("");
-  const [leadershipInstrument, setLeadershipInstrument] = useState("");
-
   const [loadedMemberId, setLoadedMemberId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -67,9 +62,6 @@ export function MemberDetailsModal({
     setFullName(memberData.full_name);
     setPhone(memberData.phone || "");
     setBirthDate(memberData.birth_date || "");
-    setLeadershipType("");
-    setLeadershipVocalGroup("");
-    setLeadershipInstrument("");
   }
 
   function handleClose() {
@@ -101,49 +93,6 @@ export function MemberDetailsModal({
     onUpdated();
   }
 
-  async function promoteLeadership() {
-    if (!member) return;
-
-    if (!leadershipType) {
-      alert("Selecione o tipo de liderança.");
-      return;
-    }
-
-    if (leadershipType === "vocal_leader" && !leadershipVocalGroup) {
-      alert("Selecione o grupo vocal.");
-      return;
-    }
-
-    if (leadershipType === "instrument_leader" && !leadershipInstrument) {
-      alert("Selecione o instrumento.");
-      return;
-    }
-
-    setLoading(true);
-
-    const { error } = await supabase.from("member_leaderships").insert({
-      member_id: member.id,
-      leadership_type: leadershipType,
-      vocal_group:
-        leadershipType === "vocal_leader" ? leadershipVocalGroup : null,
-      instrument:
-        leadershipType === "instrument_leader" ? leadershipInstrument : null,
-    });
-
-    setLoading(false);
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    setLeadershipType("");
-    setLeadershipVocalGroup("");
-    setLeadershipInstrument("");
-
-    onUpdated();
-  }
-
   async function updateStatus(status: string) {
     if (!member) return;
 
@@ -164,16 +113,66 @@ export function MemberDetailsModal({
     onUpdated();
   }
 
-  if (!open || !member) return null;
+  async function addLeadership(
+    leadershipTypeValue: string,
+    vocalGroupValue: string | null,
+    instrumentValue: string | null,
+  ) {
+    if (!member) return;
 
-  if (loadedMemberId !== member.id) {
-    openMemberForEditing(member);
-    setLoadedMemberId(member.id);
+    setLoading(true);
+
+    const { error } = await supabase.from("member_leaderships").insert({
+      member_id: member.id,
+      leadership_type: leadershipTypeValue,
+      vocal_group: vocalGroupValue,
+      instrument: instrumentValue,
+    });
+
+    setLoading(false);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    onUpdated();
   }
 
-  const canPromoteVocalLeader = member.member_functions.some(
-    (func) => func.function_type === "vocalist",
-  );
+  async function removeLeadership(leadershipId: string) {
+    setLoading(true);
+
+    const { error } = await supabase
+      .from("member_leaderships")
+      .delete()
+      .eq("id", leadershipId);
+
+    setLoading(false);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    onUpdated();
+  }
+
+  if (!open || !member) return null;
+
+  const currentMember = member;
+
+  if (loadedMemberId !== currentMember.id) {
+    openMemberForEditing(currentMember);
+    setLoadedMemberId(currentMember.id);
+  }
+
+  const memberVocalGroups = [
+    ...new Set(
+      member.member_functions
+        .filter((func) => func.function_type === "vocalist" && func.vocal_group)
+        .map((func) => func.vocal_group as string),
+    ),
+  ];
 
   const memberInstruments = member.member_functions
     .filter(
@@ -183,7 +182,19 @@ export function MemberDetailsModal({
 
   const uniqueMemberInstruments = [...new Set(memberInstruments)];
 
-  const canPromoteInstrumentLeader = uniqueMemberInstruments.length > 0;
+  function hasLeadership(
+    leadershipTypeValue: string,
+    vocalGroupValue: string | null,
+    instrumentValue: string | null,
+  ) {
+    return currentMember.member_leaderships.some((leadership) => {
+      return (
+        leadership.leadership_type === leadershipTypeValue &&
+        leadership.vocal_group === vocalGroupValue &&
+        leadership.instrument === instrumentValue
+      );
+    });
+  }
 
   return (
     <div className="fixed inset-0 z-100 flex justify-end bg-black/70 backdrop-blur-sm">
@@ -192,7 +203,7 @@ export function MemberDetailsModal({
           <div>
             <h2 className="text-2xl font-bold">Detalhes do membro</h2>
             <p className="mt-1 text-sm text-zinc-400">
-              Visualize, edite e promova lideranças.
+              Visualize, edite e gerencie lideranças.
             </p>
           </div>
 
@@ -282,86 +293,147 @@ export function MemberDetailsModal({
           <section className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-5">
             <div className="mb-4 flex items-center gap-2">
               <Crown className="text-violet-400" size={20} />
-              <h3 className="text-lg font-semibold">Promover liderança</h3>
+              <h3 className="text-lg font-semibold">Lideranças</h3>
             </div>
 
-            <div className="grid gap-3 md:grid-cols-3">
-              <Select
-                value={leadershipType}
-                onChange={(e) => setLeadershipType(e.target.value)}
-              >
-                <option value="">Tipo de liderança</option>
-                <option value="general_leader">Líder geral</option>
+            <div className="space-y-4">
+              <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="font-medium">Líder geral</p>
+                    <p className="text-sm text-zinc-500">
+                      Pode gerenciar todo o sistema.
+                    </p>
+                  </div>
 
-                {canPromoteVocalLeader && (
-                  <option value="vocal_leader">Líder vocal</option>
-                )}
+                  {hasLeadership("general_leader", null, null) ? (
+                    <Button
+                      variant="danger"
+                      onClick={() => {
+                        const leadership = member.member_leaderships.find(
+                          (item) => item.leadership_type === "general_leader",
+                        );
 
-                {canPromoteInstrumentLeader && (
-                  <option value="instrument_leader">
-                    Líder de instrumento
-                  </option>
-                )}
-              </Select>
+                        if (leadership) {
+                          removeLeadership(leadership.id);
+                        }
+                      }}
+                      disabled={loading}
+                    >
+                      Remover liderança
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={() =>
+                        addLeadership("general_leader", null, null)
+                      }
+                      disabled={loading}
+                    >
+                      Promover
+                    </Button>
+                  )}
+                </div>
+              </div>
 
-              {leadershipType === "vocal_leader" && (
-                <Select
-                  value={leadershipVocalGroup}
-                  onChange={(e) => setLeadershipVocalGroup(e.target.value)}
-                >
-                  <option value="">Grupo vocal</option>
-                  <option value="unit">Unit</option>
-                  <option value="ative">Ative</option>
-                  <option value="teens">Geração Teens</option>
-                </Select>
-              )}
-
-              {leadershipType === "instrument_leader" && (
-                <Select
-                  value={leadershipInstrument}
-                  onChange={(e) => setLeadershipInstrument(e.target.value)}
-                >
-                  <option value="">Instrumento</option>
-
-                  {uniqueMemberInstruments.map((instrument) => (
-                    <option key={instrument} value={instrument}>
-                      {instrument}
-                    </option>
-                  ))}
-                </Select>
-              )}
-
-              <Button onClick={promoteLeadership} disabled={loading}>
-                Promover
-              </Button>
-            </div>
-
-            <div className="mt-4 space-y-2">
-              {member.member_leaderships.length === 0 && (
-                <p className="text-sm text-zinc-500">
-                  Este membro ainda não possui liderança.
-                </p>
-              )}
-
-              {member.member_leaderships.map((leadership) => (
+              {memberVocalGroups.map((group) => (
                 <div
-                  key={leadership.id}
-                  className="rounded-xl border border-violet-500/30 bg-violet-500/10 px-4 py-3 text-sm text-violet-200"
+                  key={group}
+                  className="rounded-xl border border-zinc-800 bg-zinc-950 p-4"
                 >
-                  {leadership.leadership_type === "general_leader" &&
-                    "Líder geral"}
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="font-medium">
+                        Líder {vocalGroupLabels[group] || group}
+                      </p>
+                      <p className="text-sm text-zinc-500">
+                        Pode liderar o grupo vocal que pertence.
+                      </p>
+                    </div>
 
-                  {leadership.leadership_type === "vocal_leader" &&
-                    `Líder ${
-                      leadership.vocal_group
-                        ? vocalGroupLabels[leadership.vocal_group]
-                        : "vocal"
-                    }`}
+                    {hasLeadership("vocal_leader", group, null) ? (
+                      <Button
+                        variant="danger"
+                        onClick={() => {
+                          const leadership = member.member_leaderships.find(
+                            (item) =>
+                              item.leadership_type === "vocal_leader" &&
+                              item.vocal_group === group,
+                          );
 
-                  {leadership.leadership_type === "instrument_leader" &&
-                    `Líder de ${leadership.instrument}`}
+                          if (leadership) {
+                            removeLeadership(leadership.id);
+                          }
+                        }}
+                        disabled={loading}
+                      >
+                        Remover liderança
+                      </Button>
+                    ) : (
+                      <Button
+                        onClick={() =>
+                          addLeadership("vocal_leader", group, null)
+                        }
+                        disabled={loading}
+                      >
+                        Promover
+                      </Button>
+                    )}
+                  </div>
                 </div>
               ))}
+
+              {uniqueMemberInstruments.map((instrument) => (
+                <div
+                  key={instrument}
+                  className="rounded-xl border border-zinc-800 bg-zinc-950 p-4"
+                >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="font-medium">Líder de {instrument}</p>
+                      <p className="text-sm text-zinc-500">
+                        Pode liderar apenas este instrumento.
+                      </p>
+                    </div>
+
+                    {hasLeadership("instrument_leader", null, instrument) ? (
+                      <Button
+                        variant="danger"
+                        onClick={() => {
+                          const leadership = member.member_leaderships.find(
+                            (item) =>
+                              item.leadership_type === "instrument_leader" &&
+                              item.instrument === instrument,
+                          );
+
+                          if (leadership) {
+                            removeLeadership(leadership.id);
+                          }
+                        }}
+                        disabled={loading}
+                      >
+                        Remover liderança
+                      </Button>
+                    ) : (
+                      <Button
+                        onClick={() =>
+                          addLeadership("instrument_leader", null, instrument)
+                        }
+                        disabled={loading}
+                      >
+                        Promover
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {memberVocalGroups.length === 0 &&
+                uniqueMemberInstruments.length === 0 && (
+                  <p className="text-sm text-zinc-500">
+                    Este membro não possui funções que permitam promoção para
+                    liderança vocal ou instrumental.
+                  </p>
+                )}
             </div>
           </section>
 
