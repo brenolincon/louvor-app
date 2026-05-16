@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -12,18 +13,10 @@ import {
   X,
   PanelLeftClose,
   PanelLeftOpen,
+  User,
 } from "lucide-react";
-
 import { cn } from "@/lib/utils";
-
-const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/escalas", label: "Escalas", icon: CalendarDays },
-  { href: "/repertorios", label: "Repertórios", icon: Music },
-  { href: "/membros", label: "Membros", icon: Users },
-  { href: "/confirmacoes", label: "Confirmações", icon: ClipboardCheck },
-  { href: "/configuracoes", label: "Configurações", icon: Settings },
-];
+import { getCurrentUserPermissions } from "@/lib/get-current-user-permissions";
 
 type SidebarProps = {
   open?: boolean;
@@ -39,6 +32,37 @@ export function Sidebar({
   onToggleCollapse,
 }: SidebarProps) {
   const pathname = usePathname();
+  const [isGeneralLeader, setIsGeneralLeader] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadPermissions() {
+      const permissions = await getCurrentUserPermissions();
+
+      if (!mounted) return;
+
+      setIsGeneralLeader(permissions?.isGeneralLeader === true);
+    }
+
+    loadPermissions();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const navItems = [
+    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { href: "/escalas", label: "Escalas", icon: CalendarDays },
+    { href: "/repertorios", label: "Repertórios", icon: Music },
+    { href: "/membros", label: "Membros", icon: Users },
+    { href: "/confirmacoes", label: "Confirmações", icon: ClipboardCheck },
+    { href: "/perfil", label: "Meu Perfil", icon: User },
+    ...(isGeneralLeader
+      ? [{ href: "/configuracoes", label: "Configurações", icon: Settings }]
+      : []),
+  ];
 
   return (
     <>
@@ -53,14 +77,13 @@ export function Sidebar({
         className={cn(
           "fixed left-0 top-0 z-50 h-screen border-r border-zinc-800 bg-zinc-950 p-5 transition-all duration-300 lg:static lg:translate-x-0",
           collapsed ? "lg:w-24" : "lg:w-72",
-          open ? "translate-x-0 w-72" : "-translate-x-full w-72",
+          open ? "w-72 translate-x-0" : "w-72 -translate-x-full",
         )}
       >
         <div className="mb-10 flex items-start justify-between">
           {!collapsed && (
             <div>
               <div className="text-xl font-bold text-white">Louvor App</div>
-
               <div className="text-sm text-zinc-500">Gestão ministerial</div>
             </div>
           )}
@@ -95,7 +118,6 @@ export function Sidebar({
         <nav className="space-y-2">
           {navItems.map((item) => {
             const Icon = item.icon;
-
             const active = pathname.startsWith(item.href);
 
             return (
@@ -112,7 +134,6 @@ export function Sidebar({
                 )}
               >
                 <Icon size={18} className="shrink-0" />
-
                 {!collapsed && <span>{item.label}</span>}
               </Link>
             );
