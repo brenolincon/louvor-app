@@ -7,6 +7,7 @@ import { AppLayout } from "@/components/app-layout";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 
 type MemberFunction = {
   id: string;
@@ -38,6 +39,14 @@ const vocalGroupLabels: Record<string, string> = {
   teens: "Geração Teens",
 };
 
+function parseDate(date?: string) {
+  return date ? new Date(date + "T00:00:00") : undefined;
+}
+
+function formatDateInput(date?: Date) {
+  return date ? date.toISOString().split("T")[0] : "";
+}
+
 export default function PerfilPage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [fullName, setFullName] = useState("");
@@ -45,6 +54,14 @@ export default function PerfilPage() {
   const [birthDate, setBirthDate] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  const statusLabels: Record<string, string> = {
+    pending: "Aguardando aprovação",
+    approved: "Aprovado",
+    rejected: "Recusado",
+    inactive: "Inativo",
+    training: "Em treinamento",
+  };
 
   const loadProfile = useCallback(async () => {
     setLoading(true);
@@ -167,10 +184,10 @@ export default function PerfilPage() {
                 onChange={(e) => setPhone(e.target.value)}
               />
 
-              <Input
-                type="date"
-                value={birthDate}
-                onChange={(e) => setBirthDate(e.target.value)}
+              <DatePicker
+                value={parseDate(birthDate)}
+                placeholder="Data de nascimento"
+                onChange={(date) => setBirthDate(formatDateInput(date))}
               />
 
               <Button
@@ -189,7 +206,9 @@ export default function PerfilPage() {
             <div className="space-y-4">
               <div>
                 <p className="text-sm text-zinc-500">Status</p>
-                <p className="mt-1 font-medium">{profile.status}</p>
+                <p className="mt-1 font-medium">
+                  {statusLabels[profile.status] || profile.status}
+                </p>
               </div>
 
               <div>

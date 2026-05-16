@@ -8,6 +8,15 @@ import { getProfile } from "@/lib/get-profile";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
+import { DatePicker } from "@/components/ui/date-picker";
+
+function parseDate(date?: string) {
+  return date ? new Date(date + "T00:00:00") : undefined;
+}
+
+function formatDateInput(date?: Date) {
+  return date ? date.toISOString().split("T")[0] : "";
+}
 
 export default function CompletarPerfilPage() {
   const router = useRouter();
@@ -149,6 +158,11 @@ export default function CompletarPerfilPage() {
       return;
     }
 
+    if (!birthDate) {
+      alert("Informe sua data de nascimento.");
+      return;
+    }
+
     router.push("/dashboard");
   }
 
@@ -182,11 +196,10 @@ export default function CompletarPerfilPage() {
                 onChange={(e) => setPhone(e.target.value)}
               />
 
-              <Input
-                type="date"
-                value={birthDate}
-                onChange={(e) => setBirthDate(e.target.value)}
-                required
+              <DatePicker
+                value={parseDate(birthDate)}
+                placeholder="Data de nascimento"
+                onChange={(date) => setBirthDate(formatDateInput(date))}
               />
             </div>
 

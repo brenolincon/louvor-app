@@ -5,6 +5,7 @@ import { Crown, Save, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 
 type MemberFunction = {
   id: string;
@@ -44,6 +45,14 @@ const vocalGroupLabels: Record<string, string> = {
   ative: "Ative",
   teens: "Geração Teens",
 };
+
+function parseDate(date?: string) {
+  return date ? new Date(date + "T00:00:00") : undefined;
+}
+
+function formatDateInput(date?: Date) {
+  return date ? date.toISOString().split("T")[0] : "";
+}
 
 export function MemberDetailsModal({
   member,
@@ -249,10 +258,10 @@ export function MemberDetailsModal({
                 onChange={(e) => setPhone(e.target.value)}
               />
 
-              <Input
-                type="date"
-                value={birthDate}
-                onChange={(e) => setBirthDate(e.target.value)}
+              <DatePicker
+                value={parseDate(birthDate)}
+                placeholder="Data de nascimento"
+                onChange={(date) => setBirthDate(formatDateInput(date))}
               />
             </div>
           </section>

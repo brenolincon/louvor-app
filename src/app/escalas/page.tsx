@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { DatePicker } from "@/components/ui/date-picker";
 
 type WeekProfile = {
   full_name: string;
@@ -76,6 +77,14 @@ const serviceDayLabels: Record<string, string> = {
   sunday: "Domingo",
   wednesday: "Quarta",
 };
+
+function parseDate(date?: string) {
+  return date ? new Date(date + "T00:00:00") : undefined;
+}
+
+function formatDateInput(date?: Date) {
+  return date ? date.toISOString().split("T")[0] : "";
+}
 
 function formatDateBR(date: string) {
   return new Date(date + "T00:00:00").toLocaleDateString("pt-BR");
@@ -269,6 +278,11 @@ export default function EscalasPage() {
       return;
     }
 
+    if (!sundayDate) {
+      alert("Selecione o domingo da semana.");
+      return;
+    }
+
     setSundayDate("");
     setVocalGroup("");
 
@@ -309,11 +323,10 @@ export default function EscalasPage() {
                   Domingo da semana
                 </label>
 
-                <Input
-                  type="date"
-                  value={sundayDate}
-                  onChange={(e) => setSundayDate(e.target.value)}
-                  required
+                <DatePicker
+                  value={parseDate(sundayDate)}
+                  placeholder="Selecione o domingo"
+                  onChange={(date) => setSundayDate(formatDateInput(date))}
                 />
               </div>
 

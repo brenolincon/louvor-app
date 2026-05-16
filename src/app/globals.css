@@ -16,3 +16,196 @@ select,
 textarea {
   outline: none;
 }
+.rdp {
+  --rdp-accent-color: #7c3aed;
+  --rdp-background-color: #09090b;
+
+  margin: 0;
+
+  color: white;
+}
+
+.rdp-months {
+  display: flex;
+}
+
+.rdp-month {
+  width: 100%;
+}
+
+.rdp-caption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 0.5rem;
+}
+
+.rdp-caption_label {
+  color: white;
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.rdp-nav {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.rdp-button {
+  transition: 0.2s;
+}
+
+.rdp-button:hover {
+  background: #27272a !important;
+}
+
+.rdp-nav_button {
+  height: 36px;
+  width: 36px;
+
+  border-radius: 12px;
+
+  border: 1px solid #27272a;
+
+  background: #18181b;
+
+  color: #a855f7;
+}
+
+.rdp-nav_button:hover {
+  background: #27272a !important;
+  color: white !important;
+}
+
+.rdp-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.rdp-head_row {
+  display: flex;
+}
+
+.rdp-head_cell {
+  width: 42px;
+
+  font-size: 12px;
+  font-weight: 500;
+
+  color: #71717a;
+}
+
+.rdp-row {
+  display: flex;
+  margin-top: 0.35rem;
+}
+
+.rdp-cell {
+  height: 42px;
+  width: 42px;
+
+  text-align: center;
+}
+
+.rdp-day {
+  height: 42px;
+  width: 42px;
+
+  border-radius: 14px;
+
+  font-size: 14px;
+
+  color: #d4d4d8;
+
+  transition: 0.2s;
+}
+
+.rdp-day:hover {
+  background: #27272a !important;
+  color: white !important;
+}
+
+.rdp-day_selected,
+.rdp-day_selected:focus-visible,
+.rdp-day_selected:hover {
+  background: linear-gradient(135deg, #7c3aed, #a855f7) !important;
+
+  color: white !important;
+}
+
+.rdp-day_today {
+  border: 1px solid #7c3aed;
+  color: #c084fc;
+}
+
+.rdp-dropdown {
+  background: #18181b;
+
+  color: white;
+
+  border: 1px solid #27272a;
+
+  border-radius: 10px;
+
+  padding: 6px 10px;
+
+  outline: none;
+
+  transition: 0.2s;
+}
+
+.rdp-dropdown:hover {
+  border-color: #7c3aed;
+}
+
+.rdp-dropdown:focus {
+  border-color: #a855f7;
+}
+
+.rdp-dropdown option {
+  background: #18181b;
+  color: white;
+}
+
+.rdp-root {
+  --rdp-accent-color: #7c3aed !important;
+}
+
+.rdp-chevron {
+  fill: #8b5cf6 !important;
+  color: #8b5cf6 !important;
+}
+
+.rdp-dropdown {
+  appearance: none;
+  background-color: #09090b !important;
+  color: #ffffff !important;
+  border: 1px solid #27272a !important;
+  border-radius: 10px !important;
+  padding: 6px 28px 6px 10px !important;
+  font-weight: 600;
+}
+
+.rdp-dropdown:focus {
+  outline: none !important;
+  border-color: #7c3aed !important;
+}
+
+.rdp-dropdown option {
+  background-color: #09090b;
+  color: #ffffff;
+}
+
+.rdp-custom-selected,
+.rdp-day_button[aria-selected="true"] {
+  background: linear-gradient(135deg, #7c3aed, #a855f7) !important;
+  color: white !important;
+  border-color: transparent !important;
+}
+
+.rdp-custom-today:not(.rdp-custom-selected),
+.rdp-day_button[data-today="true"] {
+  color: #c084fc !important;
+  border: 1px solid #7c3aed !important;
+}
