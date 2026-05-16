@@ -2,16 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-
 import { CalendarDays } from "lucide-react";
 
 import { supabase } from "@/lib/supabase";
 import { getCurrentUserPermissions } from "@/lib/get-current-user-permissions";
 
 import { AppLayout } from "@/components/app-layout";
-
 import { Card } from "@/components/ui/card";
-
 import { InstrumentAssignmentsCard } from "@/components/weeks/instrument-assignments-card";
 import { VocalAssignmentsCard } from "@/components/weeks/vocal-assignments-card";
 
@@ -56,6 +53,13 @@ type VocalAssignment = {
   } | null;
 };
 
+type SystemSettings = {
+  max_ministers_per_service: number;
+  max_backvocals_per_service: number;
+};
+
+type Permissions = Awaited<ReturnType<typeof getCurrentUserPermissions>>;
+
 const vocalGroupLabels: Record<string, string> = {
   unit: "Unit",
   ative: "Ative",
@@ -68,43 +72,31 @@ function formatDate(date: string) {
 
 export default function EscalaDetailsPage() {
   const params = useParams();
-
   const weekId = params.id as string;
 
   const [week, setWeek] = useState<Week | null>(null);
-
-  type Permissions = Awaited<ReturnType<typeof getCurrentUserPermissions>>;
-
   const [permissions, setPermissions] = useState<Permissions>(null);
+  const [settings, setSettings] = useState<SystemSettings | null>(null);
 
   const [instrumentalists, setInstrumentalists] = useState<MemberFunction[]>(
     [],
   );
-
   const [vocalists, setVocalists] = useState<MemberFunction[]>([]);
-
   const [instrumentAssignments, setInstrumentAssignments] = useState<
     InstrumentAssignment[]
   >([]);
-
   const [vocalAssignments, setVocalAssignments] = useState<VocalAssignment[]>(
     [],
   );
 
   const [selectedInstrument, setSelectedInstrument] = useState("");
-
   const [selectedMemberId, setSelectedMemberId] = useState("");
-
   const [selectedServiceDay, setSelectedServiceDay] = useState("");
-
   const [selectedVocalRole, setSelectedVocalRole] = useState("");
-
   const [selectedVocalistId, setSelectedVocalistId] = useState("");
 
   const [savingInstrument, setSavingInstrument] = useState(false);
-
   const [savingVocal, setSavingVocal] = useState(false);
-
   const [loading, setLoading] = useState(true);
 
   const loadWeekData = useCallback(async () => {
@@ -129,12 +121,12 @@ export default function EscalaDetailsPage() {
       .from("ministry_weeks")
       .select(
         `
-          id,
-          sunday_date,
-          wednesday_date,
-          rehearsal_date,
-          vocal_group
-        `,
+        id,
+        sunday_date,
+        wednesday_date,
+        rehearsal_date,
+        vocal_group
+      `,
       )
       .eq("id", weekId)
       .single();
@@ -145,26 +137,41 @@ export default function EscalaDetailsPage() {
       return;
     }
 
+    const { data: settingsData, error: settingsError } = await supabase
+      .from("system_settings")
+      .select(
+        `
+        max_ministers_per_service,
+        max_backvocals_per_service
+      `,
+      )
+      .eq("id", 1)
+      .single();
+
+    if (settingsError) {
+      alert(settingsError.message);
+      setLoading(false);
+      return;
+    }
+
     const { data: instrumentalistsData, error: instrumentalistsError } =
       await supabase
         .from("member_functions")
         .select(
           `
-        id,
-        instrument,
-        vocal_group,
-        profiles!inner (
           id,
-          full_name,
-          status
-        )
-      `,
+          instrument,
+          vocal_group,
+          profiles!inner (
+            id,
+            full_name,
+            status
+          )
+        `,
         )
         .eq("function_type", "instrumentalist")
         .eq("profiles.status", "approved")
-        .order("instrument", {
-          ascending: true,
-        });
+        .order("instrument", { ascending: true });
 
     if (instrumentalistsError) {
       alert(instrumentalistsError.message);
@@ -189,9 +196,7 @@ export default function EscalaDetailsPage() {
       .eq("function_type", "vocalist")
       .eq("vocal_group", weekData.vocal_group)
       .eq("profiles.status", "approved")
-      .order("created_at", {
-        ascending: true,
-      });
+      .order("created_at", { ascending: true });
 
     if (vocalistsError) {
       alert(vocalistsError.message);
@@ -206,20 +211,18 @@ export default function EscalaDetailsPage() {
       .from("week_instrument_assignments")
       .select(
         `
-        id,
-        week_id,
-        member_id,
-        instrument,
-        status,
-        profiles (
-          full_name
-        )
-      `,
+          id,
+          week_id,
+          member_id,
+          instrument,
+          status,
+          profiles (
+            full_name
+          )
+        `,
       )
       .eq("week_id", weekId)
-      .order("instrument", {
-        ascending: true,
-      });
+      .order("instrument", { ascending: true });
 
     if (instrumentAssignmentsError) {
       alert(instrumentAssignmentsError.message);
@@ -232,20 +235,18 @@ export default function EscalaDetailsPage() {
         .from("week_vocal_assignments")
         .select(
           `
-        id,
-        member_id,
-        role,
-        service_day,
-        status,
-        profiles (
-          full_name
-        )
-      `,
+          id,
+          member_id,
+          role,
+          service_day,
+          status,
+          profiles (
+            full_name
+          )
+        `,
         )
         .eq("week_id", weekId)
-        .order("service_day", {
-          ascending: true,
-        });
+        .order("service_day", { ascending: true });
 
     if (vocalAssignmentsError) {
       alert(vocalAssignmentsError.message);
@@ -254,21 +255,17 @@ export default function EscalaDetailsPage() {
     }
 
     setWeek(weekData);
-
+    setSettings(settingsData);
     setInstrumentalists(
       (instrumentalistsData || []) as unknown as MemberFunction[],
     );
-
     setVocalists((vocalistsData || []) as unknown as MemberFunction[]);
-
     setInstrumentAssignments(
       (instrumentAssignmentsData || []) as unknown as InstrumentAssignment[],
     );
-
     setVocalAssignments(
       (vocalAssignmentsData || []) as unknown as VocalAssignment[],
     );
-
     setLoading(false);
   }, [weekId]);
 
@@ -282,6 +279,11 @@ export default function EscalaDetailsPage() {
 
   async function saveInstrumentAssignment(e: React.FormEvent) {
     e.preventDefault();
+
+    if (!selectedInstrument || !selectedMemberId) {
+      alert("Selecione instrumento e músico.");
+      return;
+    }
 
     const canManageAll = permissions?.isGeneralLeader === true;
 
@@ -300,7 +302,6 @@ export default function EscalaDetailsPage() {
 
     if (alreadyExists) {
       alert("Já existe um músico escalado para este instrumento.");
-
       return;
     }
 
@@ -344,19 +345,24 @@ export default function EscalaDetailsPage() {
 
     if (!selectedServiceDay || !selectedVocalRole || !selectedVocalistId) {
       alert("Preencha todos os campos.");
-
       return;
     }
 
-    const ministerExists = vocalAssignments.some(
+    const ministerCount = vocalAssignments.filter(
       (assignment) =>
         assignment.service_day === selectedServiceDay &&
         assignment.role === "minister",
-    );
+    ).length;
 
-    if (selectedVocalRole === "minister" && ministerExists) {
-      alert("Já existe um ministro escalado neste culto.");
-
+    if (
+      selectedVocalRole === "minister" &&
+      ministerCount >= (settings?.max_ministers_per_service ?? 1)
+    ) {
+      alert(
+        `Limite máximo de ${
+          settings?.max_ministers_per_service ?? 1
+        } ministro(s) atingido.`,
+      );
       return;
     }
 
@@ -366,9 +372,15 @@ export default function EscalaDetailsPage() {
         assignment.role === "backvocal",
     ).length;
 
-    if (selectedVocalRole === "backvocal" && backvocalCount >= 3) {
-      alert("Limite máximo de 3 backs por culto.");
-
+    if (
+      selectedVocalRole === "backvocal" &&
+      backvocalCount >= (settings?.max_backvocals_per_service ?? 3)
+    ) {
+      alert(
+        `Limite máximo de ${
+          settings?.max_backvocals_per_service ?? 3
+        } backs por culto.`,
+      );
       return;
     }
 
@@ -380,7 +392,6 @@ export default function EscalaDetailsPage() {
 
     if (alreadyAssigned) {
       alert("Este vocalista já está escalado neste culto.");
-
       return;
     }
 
@@ -482,7 +493,7 @@ export default function EscalaDetailsPage() {
           selectedInstrument={selectedInstrument}
           selectedMemberId={selectedMemberId}
           saving={savingInstrument}
-          canManage={!!canManageInstruments}
+          canManage={canManageInstruments}
           allowedInstruments={instrumentsUserCanManage}
           onInstrumentChange={setSelectedInstrument}
           onMemberChange={setSelectedMemberId}
@@ -496,7 +507,7 @@ export default function EscalaDetailsPage() {
           selectedVocalRole={selectedVocalRole}
           selectedVocalistId={selectedVocalistId}
           saving={savingVocal}
-          canManage={!!canManageVocals}
+          canManage={canManageVocals}
           onServiceDayChange={setSelectedServiceDay}
           onVocalRoleChange={setSelectedVocalRole}
           onVocalistChange={setSelectedVocalistId}

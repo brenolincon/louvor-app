@@ -165,31 +165,61 @@ export default function ConfiguracoesPage() {
             <h2 className="mb-4 text-xl font-semibold">Horários padrão</h2>
 
             <div className="space-y-4">
-              <Input
-                placeholder="Horário domingo"
-                value={settings.sunday_time}
-                onChange={(e) => updateField("sunday_time", e.target.value)}
-              />
+              <div>
+                <label className="mb-2 block text-sm text-zinc-400">
+                  Horário do culto de domingo
+                </label>
+                <Input
+                  placeholder="19:00"
+                  value={settings.sunday_time}
+                  onChange={(e) => updateField("sunday_time", e.target.value)}
+                />
+              </div>
 
-              <Input
-                placeholder="Horário quarta"
-                value={settings.wednesday_time}
-                onChange={(e) => updateField("wednesday_time", e.target.value)}
-              />
+              <div>
+                <label className="mb-2 block text-sm text-zinc-400">
+                  Horário do culto de quarta
+                </label>
+                <Input
+                  placeholder="19:30"
+                  value={settings.wednesday_time}
+                  onChange={(e) =>
+                    updateField("wednesday_time", e.target.value)
+                  }
+                />
+              </div>
 
-              <Input
-                placeholder="Dia padrão do ensaio"
-                value={settings.rehearsal_weekday}
-                onChange={(e) =>
-                  updateField("rehearsal_weekday", e.target.value)
-                }
-              />
+              <div>
+                <label className="mb-2 block text-sm text-zinc-400">
+                  Dia padrão do ensaio
+                </label>
 
-              <Input
-                placeholder="Horário ensaio"
-                value={settings.rehearsal_time}
-                onChange={(e) => updateField("rehearsal_time", e.target.value)}
-              />
+                <select
+                  className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm text-white"
+                  value={settings.rehearsal_weekday}
+                  onChange={(e) =>
+                    updateField("rehearsal_weekday", e.target.value)
+                  }
+                >
+                  <option value="wednesday">Quarta-feira</option>
+                  <option value="thursday">Quinta-feira</option>
+                  <option value="friday">Sexta-feira</option>
+                  <option value="saturday">Sábado</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm text-zinc-400">
+                  Horário padrão do ensaio
+                </label>
+                <Input
+                  placeholder="19:30"
+                  value={settings.rehearsal_time}
+                  onChange={(e) =>
+                    updateField("rehearsal_time", e.target.value)
+                  }
+                />
+              </div>
             </div>
           </Card>
 

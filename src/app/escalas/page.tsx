@@ -248,26 +248,68 @@ export default function EscalasPage() {
       return;
     }
 
+    if (!sundayDate) {
+      alert("Selecione o domingo da semana.");
+      return;
+    }
+
     setLoading(true);
+
+    const { data: settingsData, error: settingsError } = await supabase
+      .from("system_settings")
+      .select("*")
+      .eq("id", 1)
+      .single();
+
+    if (settingsError) {
+      setLoading(false);
+      alert(settingsError.message);
+      return;
+    }
 
     const sunday = new Date(sundayDate);
 
     const rehearsal = new Date(sunday);
-    rehearsal.setDate(sunday.getDate() - 2);
+
+    const rehearsalOffsets: Record<string, number> = {
+      monday: -6,
+      tuesday: -5,
+      wednesday: -4,
+      thursday: -3,
+      friday: -2,
+      saturday: -1,
+    };
+
+    const rehearsalOffset =
+      rehearsalOffsets[settingsData.rehearsal_weekday] ?? -2;
+
+    rehearsal.setDate(sunday.getDate() + rehearsalOffset);
 
     const wednesday = new Date(sunday);
+
     wednesday.setDate(sunday.getDate() + 3);
 
     const formatDate = (date: Date) => date.toISOString().split("T")[0];
 
     const { data: sessionData } = await supabase.auth.getSession();
+
     const user = sessionData.session?.user;
 
     const { error } = await supabase.from("ministry_weeks").insert({
       sunday_date: formatDate(sunday),
+
       wednesday_date: formatDate(wednesday),
+
       rehearsal_date: formatDate(rehearsal),
+
       vocal_group: vocalGroup,
+
+      sunday_time: settingsData.sunday_time,
+
+      wednesday_time: settingsData.wednesday_time,
+
+      rehearsal_time: settingsData.rehearsal_time,
+
       created_by: user?.id,
     });
 
@@ -278,15 +320,11 @@ export default function EscalasPage() {
       return;
     }
 
-    if (!sundayDate) {
-      alert("Selecione o domingo da semana.");
-      return;
-    }
-
     setSundayDate("");
     setVocalGroup("");
 
     const updatedWeeks = await fetchWeeks();
+
     setWeeks(updatedWeeks);
   }
 
