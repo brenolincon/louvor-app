@@ -174,6 +174,8 @@ export function MemberDetailsModal({
     ),
   ];
 
+  const isGeneralLeader = hasLeadership("general_leader", null, null);
+
   const memberInstruments = member.member_functions
     .filter(
       (func) => func.function_type === "instrumentalist" && func.instrument,
@@ -335,97 +337,106 @@ export function MemberDetailsModal({
                 </div>
               </div>
 
-              {memberVocalGroups.map((group) => (
-                <div
-                  key={group}
-                  className="rounded-xl border border-zinc-800 bg-zinc-950 p-4"
-                >
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <p className="font-medium">
-                        Líder {vocalGroupLabels[group] || group}
-                      </p>
-                      <p className="text-sm text-zinc-500">
-                        Pode liderar o grupo vocal que pertence.
-                      </p>
-                    </div>
+              {!isGeneralLeader &&
+                memberVocalGroups.map((group) => (
+                  <div
+                    key={group}
+                    className="rounded-xl border border-zinc-800 bg-zinc-950 p-4"
+                  >
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="font-medium">
+                          Líder {vocalGroupLabels[group] || group}
+                        </p>
+                        <p className="text-sm text-zinc-500">
+                          Pode liderar o grupo vocal que pertence.
+                        </p>
+                      </div>
 
-                    {hasLeadership("vocal_leader", group, null) ? (
-                      <Button
-                        variant="danger"
-                        onClick={() => {
-                          const leadership = member.member_leaderships.find(
-                            (item) =>
-                              item.leadership_type === "vocal_leader" &&
-                              item.vocal_group === group,
-                          );
+                      {hasLeadership("vocal_leader", group, null) ? (
+                        <Button
+                          variant="danger"
+                          onClick={() => {
+                            const leadership = member.member_leaderships.find(
+                              (item) =>
+                                item.leadership_type === "vocal_leader" &&
+                                item.vocal_group === group,
+                            );
 
-                          if (leadership) {
-                            removeLeadership(leadership.id);
+                            if (leadership) {
+                              removeLeadership(leadership.id);
+                            }
+                          }}
+                          disabled={loading}
+                        >
+                          Remover liderança
+                        </Button>
+                      ) : (
+                        <Button
+                          onClick={() =>
+                            addLeadership("vocal_leader", group, null)
                           }
-                        }}
-                        disabled={loading}
-                      >
-                        Remover liderança
-                      </Button>
-                    ) : (
-                      <Button
-                        onClick={() =>
-                          addLeadership("vocal_leader", group, null)
-                        }
-                        disabled={loading}
-                      >
-                        Promover
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))}
-
-              {uniqueMemberInstruments.map((instrument) => (
-                <div
-                  key={instrument}
-                  className="rounded-xl border border-zinc-800 bg-zinc-950 p-4"
-                >
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <p className="font-medium">Líder de {instrument}</p>
-                      <p className="text-sm text-zinc-500">
-                        Pode liderar apenas este instrumento.
-                      </p>
+                          disabled={loading}
+                        >
+                          Promover
+                        </Button>
+                      )}
                     </div>
-
-                    {hasLeadership("instrument_leader", null, instrument) ? (
-                      <Button
-                        variant="danger"
-                        onClick={() => {
-                          const leadership = member.member_leaderships.find(
-                            (item) =>
-                              item.leadership_type === "instrument_leader" &&
-                              item.instrument === instrument,
-                          );
-
-                          if (leadership) {
-                            removeLeadership(leadership.id);
-                          }
-                        }}
-                        disabled={loading}
-                      >
-                        Remover liderança
-                      </Button>
-                    ) : (
-                      <Button
-                        onClick={() =>
-                          addLeadership("instrument_leader", null, instrument)
-                        }
-                        disabled={loading}
-                      >
-                        Promover
-                      </Button>
-                    )}
                   </div>
-                </div>
-              ))}
+                ))}
+
+              {!isGeneralLeader &&
+                uniqueMemberInstruments.map((instrument) => (
+                  <div
+                    key={instrument}
+                    className="rounded-xl border border-zinc-800 bg-zinc-950 p-4"
+                  >
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="font-medium">Líder de {instrument}</p>
+                        <p className="text-sm text-zinc-500">
+                          Pode liderar apenas este instrumento.
+                        </p>
+                      </div>
+
+                      {hasLeadership("instrument_leader", null, instrument) ? (
+                        <Button
+                          variant="danger"
+                          onClick={() => {
+                            const leadership = member.member_leaderships.find(
+                              (item) =>
+                                item.leadership_type === "instrument_leader" &&
+                                item.instrument === instrument,
+                            );
+
+                            if (leadership) {
+                              removeLeadership(leadership.id);
+                            }
+                          }}
+                          disabled={loading}
+                        >
+                          Remover liderança
+                        </Button>
+                      ) : (
+                        <Button
+                          onClick={() =>
+                            addLeadership("instrument_leader", null, instrument)
+                          }
+                          disabled={loading}
+                        >
+                          Promover
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+
+              {isGeneralLeader && (
+                <p className="text-sm text-zinc-500">
+                  Este membro já é líder geral, então não precisa receber
+                  liderança vocal ou instrumental.
+                </p>
+              )}
 
               {memberVocalGroups.length === 0 &&
                 uniqueMemberInstruments.length === 0 && (

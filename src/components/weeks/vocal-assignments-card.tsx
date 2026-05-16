@@ -1,11 +1,14 @@
 import { Mic2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 
-type Vocalist = {
+type VocalistFunction = {
   id: string;
-  full_name: string;
-  vocal_role: string | null;
   vocal_group: string | null;
+  profiles: {
+    id: string;
+    full_name: string;
+    status: string;
+  } | null;
 };
 
 type VocalAssignment = {
@@ -14,15 +17,15 @@ type VocalAssignment = {
   role: string;
   service_day: string;
   status: string;
-  profiles:
-    | {
-        full_name: string;
-      }[]
-    | null;
+  profiles: {
+    id: string;
+    full_name: string;
+    status: string;
+  } | null;
 };
 
 type Props = {
-  vocalists: Vocalist[];
+  vocalists: VocalistFunction[];
   assignments: VocalAssignment[];
   selectedServiceDay: string;
   selectedVocalRole: string;
@@ -71,7 +74,7 @@ export function VocalAssignmentsCard({
           onChange={(e) => onVocalRoleChange(e.target.value)}
           required
         >
-          <option value="">Função</option>
+          <option value="">Função na escala</option>
           <option value="minister">Ministro</option>
           <option value="backvocal">Backvocal</option>
         </select>
@@ -84,17 +87,17 @@ export function VocalAssignmentsCard({
         >
           <option value="">Vocalista</option>
 
-          {vocalists
-            .filter((vocalist) =>
-              selectedVocalRole
-                ? vocalist.vocal_role === selectedVocalRole
-                : true,
-            )
-            .map((vocalist) => (
-              <option key={vocalist.id} value={vocalist.id}>
-                {vocalist.full_name}
+          {vocalists.map((vocalist) => {
+            const profile = vocalist.profiles;
+
+            if (!profile) return null;
+
+            return (
+              <option key={vocalist.id} value={profile.id}>
+                {profile.full_name}
               </option>
-            ))}
+            );
+          })}
         </select>
 
         <button
@@ -121,7 +124,7 @@ export function VocalAssignmentsCard({
               </p>
 
               <p className="text-sm text-zinc-400">
-                {assignment.profiles?.[0]?.full_name}
+                {assignment.profiles?.full_name}
               </p>
             </div>
 

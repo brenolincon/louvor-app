@@ -1,12 +1,14 @@
 import { Users } from "lucide-react";
 import { Card } from "@/components/ui/card";
 
-type Profile = {
+type InstrumentalistFunction = {
   id: string;
-  full_name: string;
   instrument: string | null;
-  status: string;
-  member_type: string | null;
+  profiles: {
+    id: string;
+    full_name: string;
+    status: string;
+  } | null;
 };
 
 type InstrumentAssignment = {
@@ -15,15 +17,15 @@ type InstrumentAssignment = {
   member_id: string;
   instrument: string;
   status: string;
-  profiles:
-    | {
-        full_name: string;
-      }[]
-    | null;
+  profiles: {
+    id: string;
+    full_name: string;
+    status: string;
+  } | null;
 };
 
 type Props = {
-  instrumentalists: Profile[];
+  instrumentalists: InstrumentalistFunction[];
   assignments: InstrumentAssignment[];
   selectedInstrument: string;
   selectedMemberId: string;
@@ -43,6 +45,14 @@ export function InstrumentAssignmentsCard({
   onMemberChange,
   onSubmit,
 }: Props) {
+  const instruments = [
+    ...new Set(instrumentalists.map((member) => member.instrument)),
+  ].filter(Boolean);
+
+  const availableMembers = instrumentalists.filter((member) =>
+    selectedInstrument ? member.instrument === selectedInstrument : true,
+  );
+
   return (
     <Card>
       <div className="mb-4 flex items-center gap-3">
@@ -59,13 +69,11 @@ export function InstrumentAssignmentsCard({
         >
           <option value="">Instrumento</option>
 
-          {[...new Set(instrumentalists.map((member) => member.instrument))]
-            .filter(Boolean)
-            .map((instrument) => (
-              <option key={instrument} value={instrument || ""}>
-                {instrument}
-              </option>
-            ))}
+          {instruments.map((instrument) => (
+            <option key={instrument} value={instrument || ""}>
+              {instrument}
+            </option>
+          ))}
         </select>
 
         <select
@@ -76,17 +84,17 @@ export function InstrumentAssignmentsCard({
         >
           <option value="">Músico</option>
 
-          {instrumentalists
-            .filter((member) =>
-              selectedInstrument
-                ? member.instrument === selectedInstrument
-                : true,
-            )
-            .map((member) => (
-              <option key={member.id} value={member.id}>
-                {member.full_name}
+          {availableMembers.map((member) => {
+            const profile = member.profiles;
+
+            if (!profile) return null;
+
+            return (
+              <option key={member.id} value={profile.id}>
+                {profile.full_name}
               </option>
-            ))}
+            );
+          })}
         </select>
 
         <button
@@ -112,7 +120,7 @@ export function InstrumentAssignmentsCard({
             <div>
               <p className="font-medium">{assignment.instrument}</p>
               <p className="text-sm text-zinc-400">
-                {assignment.profiles?.[0]?.full_name}
+                {assignment.profiles?.full_name}
               </p>
             </div>
 

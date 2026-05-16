@@ -1,53 +1,31 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-
+import { CalendarDays } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { AppLayout } from "@/components/app-layout";
-
-import { WeekHeader } from "@/components/weeks/week-header";
-import { WeekSummaryCards } from "@/components/weeks/week-summary-cards";
+import { Card } from "@/components/ui/card";
 import { InstrumentAssignmentsCard } from "@/components/weeks/instrument-assignments-card";
 import { VocalAssignmentsCard } from "@/components/weeks/vocal-assignments-card";
 
-import { RepertoireCard } from "@/components/weeks/repertoire-card";
-import { ConfirmationsCard } from "@/components/weeks/confirmations-card";
-
-type RepertoireSong = {
-  id: string;
-  song_name: string;
-  version_name: string | null;
-  key_signature: string | null;
-  song_order: number | null;
-};
-
-type WeekRepertoire = {
-  id: string;
-  service_day: string;
-  playlist_url: string | null;
-  approval_status: string;
-  week_repertoire_songs: RepertoireSong[];
-};
-
-type MinistryWeek = {
+type Week = {
   id: string;
   sunday_date: string;
   wednesday_date: string;
   rehearsal_date: string;
-  rehearsal_time: string;
-  sunday_time: string;
-  wednesday_time: string;
   vocal_group: string;
-  status: string;
 };
 
-type Profile = {
+type MemberFunction = {
   id: string;
-  full_name: string;
   instrument: string | null;
-  status: string;
-  member_type: string | null;
+  vocal_group: string | null;
+  profiles: {
+    id: string;
+    full_name: string;
+    status: string;
+  } | null;
 };
 
 type InstrumentAssignment = {
@@ -56,18 +34,9 @@ type InstrumentAssignment = {
   member_id: string;
   instrument: string;
   status: string;
-  profiles:
-    | {
-        full_name: string;
-      }[]
-    | null;
-};
-
-type Vocalist = {
-  id: string;
-  full_name: string;
-  vocal_role: string | null;
-  vocal_group: string | null;
+  profiles: {
+    full_name: string;
+  } | null;
 };
 
 type VocalAssignment = {
@@ -76,129 +45,179 @@ type VocalAssignment = {
   role: string;
   service_day: string;
   status: string;
-  profiles:
-    | {
-        full_name: string;
-      }[]
-    | null;
+  profiles: {
+    full_name: string;
+  } | null;
 };
 
-export default function WeekDetailsPage() {
-  const [repertoires, setRepertoires] = useState<WeekRepertoire[]>([]);
+const vocalGroupLabels: Record<string, string> = {
+  unit: "Unit",
+  ative: "Ative",
+  teens: "Geração Teens",
+};
 
-  const [selectedRepertoireServiceDay, setSelectedRepertoireServiceDay] =
-    useState("");
+function formatDate(date: string) {
+  return new Date(date + "T00:00:00").toLocaleDateString("pt-BR");
+}
 
-  const [playlistUrl, setPlaylistUrl] = useState("");
-  const [songName, setSongName] = useState("");
-  const [versionName, setVersionName] = useState("");
-  const [keySignature, setKeySignature] = useState("");
-  const [savingRepertoireSong, setSavingRepertoireSong] = useState(false);
-
+export default function EscalaDetailsPage() {
   const params = useParams();
   const weekId = params.id as string;
 
-  const [week, setWeek] = useState<MinistryWeek | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const [instrumentalists, setInstrumentalists] = useState<Profile[]>([]);
+  const [week, setWeek] = useState<Week | null>(null);
+  const [instrumentalists, setInstrumentalists] = useState<MemberFunction[]>(
+    [],
+  );
+  const [vocalists, setVocalists] = useState<MemberFunction[]>([]);
   const [instrumentAssignments, setInstrumentAssignments] = useState<
     InstrumentAssignment[]
   >([]);
-
-  const [selectedInstrument, setSelectedInstrument] = useState("");
-  const [selectedMemberId, setSelectedMemberId] = useState("");
-  const [savingInstrument, setSavingInstrument] = useState(false);
-
-  const [vocalists, setVocalists] = useState<Vocalist[]>([]);
   const [vocalAssignments, setVocalAssignments] = useState<VocalAssignment[]>(
     [],
   );
 
+  const [selectedInstrument, setSelectedInstrument] = useState("");
+  const [selectedMemberId, setSelectedMemberId] = useState("");
   const [selectedServiceDay, setSelectedServiceDay] = useState("");
   const [selectedVocalRole, setSelectedVocalRole] = useState("");
   const [selectedVocalistId, setSelectedVocalistId] = useState("");
+
+  const [savingInstrument, setSavingInstrument] = useState(false);
   const [savingVocal, setSavingVocal] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const fetchRepertoires = useCallback(async () => {
-    const { data, error } = await supabase
-      .from("week_repertoires")
-      .select(
-        `
-      id,
-      service_day,
-      playlist_url,
-      approval_status,
-      week_repertoire_songs (
-        id,
-        song_name,
-        version_name,
-        key_signature,
-        song_order
-      )
-    `,
-      )
-      .eq("week_id", weekId)
-      .order("service_day", { ascending: true });
+  const loadWeekData = useCallback(async () => {
+    setLoading(true);
 
-    if (error) {
-      alert(error.message);
-      return [];
+    const { data: weekData, error: weekError } = await supabase
+      .from("ministry_weeks")
+      .select("id, sunday_date, wednesday_date, rehearsal_date, vocal_group")
+      .eq("id", weekId)
+      .single();
+
+    if (weekError) {
+      alert(weekError.message);
+      setLoading(false);
+      return;
     }
 
-    return data || [];
-  }, [weekId]);
+    const { data: instrumentalistsData, error: instrumentalistsError } =
+      await supabase
+        .from("member_functions")
+        .select(
+          `
+          id,
+          instrument,
+          vocal_group,
+          profiles!inner (
+            id,
+            full_name,
+            status
+          )
+        `,
+        )
+        .eq("function_type", "instrumentalist")
+        .eq("profiles.status", "approved")
+        .order("instrument", { ascending: true });
 
-  const fetchInstrumentAssignments = useCallback(async () => {
-    const { data, error } = await supabase
+    if (instrumentalistsError) {
+      alert(instrumentalistsError.message);
+      setLoading(false);
+      return;
+    }
+
+    const { data: vocalistsData, error: vocalistsError } = await supabase
+      .from("member_functions")
+      .select(
+        `
+        id,
+        instrument,
+        vocal_group,
+        profiles!inner (
+          id,
+          full_name,
+          status
+        )
+      `,
+      )
+      .eq("function_type", "vocalist")
+      .eq("vocal_group", weekData.vocal_group)
+      .eq("profiles.status", "approved")
+      .order("created_at", { ascending: true });
+
+    if (vocalistsError) {
+      alert(vocalistsError.message);
+      setLoading(false);
+      return;
+    }
+
+    const {
+      data: instrumentAssignmentsData,
+      error: instrumentAssignmentsError,
+    } = await supabase
       .from("week_instrument_assignments")
       .select(
         `
-        id,
-        week_id,
-        member_id,
-        instrument,
-        status,
-        profiles (
-          full_name
-        )
-      `,
+          id,
+          week_id,
+          member_id,
+          instrument,
+          status,
+          profiles (
+            full_name
+          )
+        `,
       )
       .eq("week_id", weekId)
       .order("instrument", { ascending: true });
 
-    if (error) {
-      alert(error.message);
-      return [];
+    if (instrumentAssignmentsError) {
+      alert(instrumentAssignmentsError.message);
+      setLoading(false);
+      return;
     }
 
-    return data || [];
-  }, [weekId]);
-
-  const fetchVocalAssignments = useCallback(async () => {
-    const { data, error } = await supabase
-      .from("week_vocal_assignments")
-      .select(
-        `
-        id,
-        member_id,
-        role,
-        service_day,
-        status,
-        profiles (
-          full_name
+    const { data: vocalAssignmentsData, error: vocalAssignmentsError } =
+      await supabase
+        .from("week_vocal_assignments")
+        .select(
+          `
+          id,
+          member_id,
+          role,
+          service_day,
+          status,
+          profiles (
+            full_name
+          )
+        `,
         )
-      `,
-      )
-      .eq("week_id", weekId);
+        .eq("week_id", weekId)
+        .order("service_day", { ascending: true });
 
-    if (error) {
-      alert(error.message);
-      return [];
+    if (vocalAssignmentsError) {
+      alert(vocalAssignmentsError.message);
+      setLoading(false);
+      return;
     }
 
-    return data || [];
+    setWeek(weekData);
+    setInstrumentalists(
+      (instrumentalistsData || []) as unknown as MemberFunction[],
+    );
+    setVocalists((vocalistsData || []) as unknown as MemberFunction[]);
+    setInstrumentAssignments(
+      (instrumentAssignmentsData || []) as unknown as InstrumentAssignment[],
+    );
+    setVocalAssignments(
+      (vocalAssignmentsData || []) as unknown as VocalAssignment[],
+    );
+    setLoading(false);
   }, [weekId]);
+
+  useEffect(() => {
+    loadWeekData();
+  }, [loadWeekData]);
 
   async function saveInstrumentAssignment(e: React.FormEvent) {
     e.preventDefault();
@@ -208,19 +227,25 @@ export default function WeekDetailsPage() {
       return;
     }
 
+    const alreadyExists = instrumentAssignments.some(
+      (assignment) => assignment.instrument === selectedInstrument,
+    );
+
+    if (alreadyExists) {
+      alert("Já existe um músico escalado para este instrumento.");
+      return;
+    }
+
     setSavingInstrument(true);
 
-    const { error } = await supabase.from("week_instrument_assignments").upsert(
-      {
+    const { error } = await supabase
+      .from("week_instrument_assignments")
+      .insert({
         week_id: weekId,
-        instrument: selectedInstrument,
         member_id: selectedMemberId,
+        instrument: selectedInstrument,
         status: "pending",
-      },
-      {
-        onConflict: "week_id,instrument",
-      },
-    );
+      });
 
     setSavingInstrument(false);
 
@@ -231,9 +256,7 @@ export default function WeekDetailsPage() {
 
     setSelectedInstrument("");
     setSelectedMemberId("");
-
-    const updatedAssignments = await fetchInstrumentAssignments();
-    setInstrumentAssignments(updatedAssignments);
+    await loadWeekData();
   }
 
   async function saveVocalAssignment(e: React.FormEvent) {
@@ -241,6 +264,39 @@ export default function WeekDetailsPage() {
 
     if (!selectedServiceDay || !selectedVocalRole || !selectedVocalistId) {
       alert("Preencha todos os campos.");
+      return;
+    }
+
+    const ministerExists = vocalAssignments.some(
+      (assignment) =>
+        assignment.service_day === selectedServiceDay &&
+        assignment.role === "minister",
+    );
+
+    if (selectedVocalRole === "minister" && ministerExists) {
+      alert("Já existe um ministro escalado neste culto.");
+      return;
+    }
+
+    const backvocalCount = vocalAssignments.filter(
+      (assignment) =>
+        assignment.service_day === selectedServiceDay &&
+        assignment.role === "backvocal",
+    ).length;
+
+    if (selectedVocalRole === "backvocal" && backvocalCount >= 3) {
+      alert("Limite máximo de 3 backs por culto.");
+      return;
+    }
+
+    const alreadyAssigned = vocalAssignments.some(
+      (assignment) =>
+        assignment.service_day === selectedServiceDay &&
+        assignment.member_id === selectedVocalistId,
+    );
+
+    if (alreadyAssigned) {
+      alert("Este vocalista já está escalado neste culto.");
       return;
     }
 
@@ -264,97 +320,15 @@ export default function WeekDetailsPage() {
     setSelectedServiceDay("");
     setSelectedVocalRole("");
     setSelectedVocalistId("");
-
-    const updatedAssignments = await fetchVocalAssignments();
-    setVocalAssignments(updatedAssignments);
+    await loadWeekData();
   }
-
-  useEffect(() => {
-    let isMounted = true;
-
-    async function loadWeekData() {
-      setLoading(true);
-
-      const { data: weekData, error: weekError } = await supabase
-        .from("ministry_weeks")
-        .select("*")
-        .eq("id", weekId)
-        .single();
-
-      if (!isMounted) return;
-
-      if (weekError) {
-        alert(weekError.message);
-        setLoading(false);
-        return;
-      }
-
-      const { data: instrumentalistsData, error: instrumentalistsError } =
-        await supabase
-          .from("profiles")
-          .select("id, full_name, instrument, status, member_type")
-          .eq("member_type", "instrumentalist")
-          .eq("status", "approved")
-          .order("full_name", { ascending: true });
-
-      if (!isMounted) return;
-
-      if (instrumentalistsError) {
-        alert(instrumentalistsError.message);
-        setLoading(false);
-        return;
-      }
-
-      const { data: vocalistsData, error: vocalistsError } = await supabase
-        .from("profiles")
-        .select("id, full_name, vocal_role, vocal_group")
-        .eq("member_type", "vocalist")
-        .eq("status", "approved")
-        .eq("vocal_group", weekData.vocal_group)
-        .order("full_name", { ascending: true });
-
-      if (!isMounted) return;
-
-      if (vocalistsError) {
-        alert(vocalistsError.message);
-        setLoading(false);
-        return;
-      }
-
-      const instrumentAssignmentsData = await fetchInstrumentAssignments();
-      const vocalAssignmentsData = await fetchVocalAssignments();
-
-      const repertoiresData = await fetchRepertoires();
-
-      if (!isMounted) return;
-
-      setWeek(weekData);
-      setInstrumentalists(instrumentalistsData || []);
-      setVocalists(vocalistsData || []);
-      setInstrumentAssignments(instrumentAssignmentsData);
-      setVocalAssignments(vocalAssignmentsData);
-      setLoading(false);
-      setRepertoires(repertoiresData);
-    }
-
-    if (weekId) {
-      loadWeekData();
-    }
-
-    return () => {
-      isMounted = false;
-    };
-  }, [
-    weekId,
-    fetchInstrumentAssignments,
-    fetchVocalAssignments,
-    fetchRepertoires,
-  ]);
 
   if (loading) {
     return (
       <AppLayout>
-        <p className="text-zinc-400">Carregando semana...</p>
+        <Card>
+          <p className="text-zinc-400">Carregando escala...</p>
+        </Card>
       </AppLayout>
     );
   }
@@ -362,130 +336,35 @@ export default function WeekDetailsPage() {
   if (!week) {
     return (
       <AppLayout>
-        <p className="text-zinc-400">Semana não encontrada.</p>
+        <Card>
+          <p className="text-zinc-400">Escala não encontrada.</p>
+        </Card>
       </AppLayout>
     );
   }
 
-  async function saveRepertoireSong(e: React.FormEvent) {
-    e.preventDefault();
-
-    if (!selectedRepertoireServiceDay || !songName) {
-      alert("Selecione o culto e informe o nome da música.");
-      return;
-    }
-
-    setSavingRepertoireSong(true);
-
-    const { data: sessionData } = await supabase.auth.getSession();
-    const user = sessionData.session?.user;
-
-    const { data: repertoire, error: repertoireError } = await supabase
-      .from("week_repertoires")
-      .upsert(
-        {
-          week_id: weekId,
-          service_day: selectedRepertoireServiceDay,
-          playlist_url: playlistUrl,
-          created_by: user?.id,
-        },
-        {
-          onConflict: "week_id,service_day",
-        },
-      )
-      .select("id")
-      .single();
-
-    if (repertoireError) {
-      setSavingRepertoireSong(false);
-      alert(repertoireError.message);
-      return;
-    }
-
-    const { count } = await supabase
-      .from("week_repertoire_songs")
-      .select("*", { count: "exact", head: true })
-      .eq("repertoire_id", repertoire.id);
-
-    const { error: songError } = await supabase
-      .from("week_repertoire_songs")
-      .insert({
-        repertoire_id: repertoire.id,
-        song_name: songName,
-        version_name: versionName,
-        key_signature: keySignature,
-        song_order: (count || 0) + 1,
-      });
-
-    setSavingRepertoireSong(false);
-
-    if (songError) {
-      alert(songError.message);
-      return;
-    }
-
-    setSongName("");
-    setVersionName("");
-    setKeySignature("");
-
-    const updatedRepertoires = await fetchRepertoires();
-    setRepertoires(updatedRepertoires);
-  }
-
-  async function updateInstrumentConfirmation(
-    assignmentId: string,
-    status: string,
-  ) {
-    const { error } = await supabase
-      .from("week_instrument_assignments")
-      .update({ status })
-      .eq("id", assignmentId);
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    const updatedAssignments = await fetchInstrumentAssignments();
-
-    setInstrumentAssignments(updatedAssignments);
-  }
-
-  async function updateVocalConfirmation(assignmentId: string, status: string) {
-    const { error } = await supabase
-      .from("week_vocal_assignments")
-      .update({ status })
-      .eq("id", assignmentId);
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    const updatedAssignments = await fetchVocalAssignments();
-
-    setVocalAssignments(updatedAssignments);
-  }
-
   return (
     <AppLayout>
-      <WeekHeader
-        sundayDate={week.sunday_date}
-        wednesdayDate={week.wednesday_date}
-        vocalGroup={week.vocal_group}
-        status={week.status}
-      />
+      <div className="mb-8">
+        <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-600">
+          <CalendarDays size={24} />
+        </div>
 
-      <WeekSummaryCards
-        rehearsalDate={week.rehearsal_date}
-        rehearsalTime={week.rehearsal_time}
-        sundayDate={week.sunday_date}
-        sundayTime={week.sunday_time}
-        wednesdayDate={week.wednesday_date}
-        wednesdayTime={week.wednesday_time}
-      />
+        <h1 className="text-3xl font-bold">
+          Semana {formatDate(week.sunday_date)} a{" "}
+          {formatDate(week.wednesday_date)}
+        </h1>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+        <p className="mt-2 text-zinc-400">
+          Grupo vocal: {vocalGroupLabels[week.vocal_group] || week.vocal_group}
+        </p>
+
+        <p className="text-sm text-zinc-500">
+          Ensaio: {formatDate(week.rehearsal_date)}
+        </p>
+      </div>
+
+      <div className="grid gap-5 xl:grid-cols-2">
         <InstrumentAssignmentsCard
           instrumentalists={instrumentalists}
           assignments={instrumentAssignments}
@@ -509,50 +388,6 @@ export default function WeekDetailsPage() {
           onVocalistChange={setSelectedVocalistId}
           onSubmit={saveVocalAssignment}
         />
-
-        <RepertoireCard
-          repertoires={repertoires}
-          selectedServiceDay={selectedRepertoireServiceDay}
-          playlistUrl={playlistUrl}
-          songName={songName}
-          versionName={versionName}
-          keySignature={keySignature}
-          saving={savingRepertoireSong}
-          onServiceDayChange={setSelectedRepertoireServiceDay}
-          onPlaylistUrlChange={setPlaylistUrl}
-          onSongNameChange={setSongName}
-          onVersionNameChange={setVersionName}
-          onKeySignatureChange={setKeySignature}
-          onSubmit={saveRepertoireSong}
-        />
-
-        <div className="space-y-4">
-          <ConfirmationsCard
-            title="Confirmações Instrumentistas"
-            assignments={instrumentAssignments.map((assignment) => ({
-              id: assignment.id,
-              role: assignment.instrument,
-              instrument: assignment.instrument,
-              status: assignment.status,
-              profiles: assignment.profiles,
-            }))}
-            onConfirm={(id) => updateInstrumentConfirmation(id, "confirmed")}
-            onDecline={(id) => updateInstrumentConfirmation(id, "declined")}
-          />
-
-          <ConfirmationsCard
-            title="Confirmações Vozes"
-            assignments={vocalAssignments.map((assignment) => ({
-              id: assignment.id,
-              role: assignment.role === "minister" ? "Ministro" : "Backvocal",
-              service_day: assignment.service_day,
-              status: assignment.status,
-              profiles: assignment.profiles,
-            }))}
-            onConfirm={(id) => updateVocalConfirmation(id, "confirmed")}
-            onDecline={(id) => updateVocalConfirmation(id, "declined")}
-          />
-        </div>
       </div>
     </AppLayout>
   );
