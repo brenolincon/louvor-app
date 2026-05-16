@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { supabase } from "@/lib/supabase";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
@@ -18,6 +19,11 @@ import {
 import { cn } from "@/lib/utils";
 import { getCurrentUserPermissions } from "@/lib/get-current-user-permissions";
 
+type SystemSettings = {
+  ministry_name: string;
+  church_name: string;
+};
+
 type SidebarProps = {
   open?: boolean;
   collapsed?: boolean;
@@ -33,19 +39,30 @@ export function Sidebar({
 }: SidebarProps) {
   const pathname = usePathname();
   const [isGeneralLeader, setIsGeneralLeader] = useState(false);
+  const [settings, setSettings] = useState<SystemSettings | null>(null);
 
   useEffect(() => {
     let mounted = true;
 
-    async function loadPermissions() {
+    async function loadData() {
       const permissions = await getCurrentUserPermissions();
 
       if (!mounted) return;
 
       setIsGeneralLeader(permissions?.isGeneralLeader === true);
+
+      const { data } = await supabase
+        .from("system_settings")
+        .select("ministry_name, church_name")
+        .eq("id", 1)
+        .single();
+
+      if (!mounted) return;
+
+      setSettings(data);
     }
 
-    loadPermissions();
+    loadData();
 
     return () => {
       mounted = false;
@@ -83,8 +100,13 @@ export function Sidebar({
         <div className="mb-10 flex items-start justify-between">
           {!collapsed && (
             <div>
-              <div className="text-xl font-bold text-white">Louvor App</div>
-              <div className="text-sm text-zinc-500">Gestão ministerial</div>
+              <div className="text-xl font-bold text-white">
+                {settings?.ministry_name || "Louvor App"}
+              </div>
+
+              <div className="text-sm text-zinc-500">
+                {settings?.church_name || "Gestão ministerial"}
+              </div>
             </div>
           )}
 
