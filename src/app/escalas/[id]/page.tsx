@@ -73,7 +73,9 @@ export default function EscalaDetailsPage() {
 
   const [week, setWeek] = useState<Week | null>(null);
 
-  const [permissions, setPermissions] = useState<any>(null);
+  type Permissions = Awaited<ReturnType<typeof getCurrentUserPermissions>>;
+
+  const [permissions, setPermissions] = useState<Permissions>(null);
 
   const [instrumentalists, setInstrumentalists] = useState<MemberFunction[]>(
     [],
@@ -271,7 +273,11 @@ export default function EscalaDetailsPage() {
   }, [weekId]);
 
   useEffect(() => {
-    loadWeekData();
+    async function init() {
+      await loadWeekData();
+    }
+
+    init();
   }, [loadWeekData]);
 
   async function saveInstrumentAssignment(e: React.FormEvent) {

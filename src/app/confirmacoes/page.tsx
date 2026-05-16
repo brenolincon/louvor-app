@@ -132,7 +132,11 @@ export default function ConfirmacoesPage() {
   }, []);
 
   useEffect(() => {
-    loadConfirmations();
+    async function init() {
+      await loadConfirmations();
+    }
+
+    init();
   }, [loadConfirmations]);
 
   async function updateInstrumentStatus(id: string, status: string) {

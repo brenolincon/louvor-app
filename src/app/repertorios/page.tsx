@@ -154,7 +154,11 @@ export default function RepertoriosPage() {
   }, []);
 
   useEffect(() => {
-    loadRepertoires();
+    async function init() {
+      await loadRepertoires();
+    }
+
+    init();
   }, [loadRepertoires]);
 
   return (
