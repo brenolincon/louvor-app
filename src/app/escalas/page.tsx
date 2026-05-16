@@ -4,12 +4,16 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { CalendarDays } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { getCurrentUserPermissions } from "@/lib/get-current-user-permissions";
 import { AppLayout } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { getCurrentUserPermissions } from "@/lib/get-current-user-permissions";
+
+type WeekProfile = {
+  full_name: string;
+} | null;
 
 type MinistryWeek = {
   id: string;
@@ -22,7 +26,24 @@ type MinistryWeek = {
   vocal_group: string;
   status: string;
   created_at: string;
+
+  week_instrument_assignments?: {
+    id: string;
+    instrument: string;
+    status: string;
+    profiles: WeekProfile;
+  }[];
+
+  week_vocal_assignments?: {
+    id: string;
+    role: string;
+    service_day: string;
+    status: string;
+    profiles: WeekProfile;
+  }[];
 };
+
+type Permissions = Awaited<ReturnType<typeof getCurrentUserPermissions>>;
 
 const vocalGroupLabels: Record<string, string> = {
   unit: "Unit",
@@ -38,19 +59,36 @@ const statusLabels: Record<string, string> = {
   published: "Publicada",
 };
 
+const assignmentStatusLabels: Record<string, string> = {
+  pending: "Pendente",
+  confirmed: "Confirmado",
+  declined: "Recusado",
+  justified: "Justificado",
+  substituted: "Substituído",
+};
+
+const vocalRoleLabels: Record<string, string> = {
+  minister: "Ministro",
+  backvocal: "Backvocal",
+};
+
+const serviceDayLabels: Record<string, string> = {
+  sunday: "Domingo",
+  wednesday: "Quarta",
+};
+
+function formatDateBR(date: string) {
+  return new Date(date + "T00:00:00").toLocaleDateString("pt-BR");
+}
+
 export default function EscalasPage() {
   const [sundayDate, setSundayDate] = useState("");
   const [vocalGroup, setVocalGroup] = useState("");
   const [weeks, setWeeks] = useState<MinistryWeek[]>([]);
+  const [permissions, setPermissions] = useState<Permissions>(null);
+
   const [loading, setLoading] = useState(false);
   const [loadingWeeks, setLoadingWeeks] = useState(true);
-  const [permissions, setPermissions] = useState<Awaited<
-    ReturnType<typeof getCurrentUserPermissions>
-  > | null>(null);
-
-  function formatDateBR(date: string) {
-    return new Date(date + "T00:00:00").toLocaleDateString("pt-BR");
-  }
 
   async function fetchWeeks() {
     const currentPermissions = await getCurrentUserPermissions();
@@ -59,10 +97,33 @@ export default function EscalasPage() {
       return [];
     }
 
+    setPermissions(currentPermissions);
+
     if (currentPermissions.isAnyLeader) {
       const { data, error } = await supabase
         .from("ministry_weeks")
-        .select("*")
+        .select(
+          `
+          *,
+          week_instrument_assignments (
+            id,
+            instrument,
+            status,
+            profiles (
+              full_name
+            )
+          ),
+          week_vocal_assignments (
+            id,
+            role,
+            service_day,
+            status,
+            profiles (
+              full_name
+            )
+          )
+        `,
+        )
         .order("sunday_date", { ascending: false });
 
       if (error) {
@@ -70,29 +131,83 @@ export default function EscalasPage() {
         return [];
       }
 
-      return data || [];
+      return (data || []) as unknown as MinistryWeek[];
     }
 
-    const { data: instrumentWeeks } = await supabase
+    const { data: instrumentWeeks, error: instrumentError } = await supabase
       .from("week_instrument_assignments")
-      .select("ministry_weeks (*)")
+      .select(
+        `
+        ministry_weeks (
+          *,
+          week_instrument_assignments (
+            id,
+            instrument,
+            status,
+            profiles (
+              full_name
+            )
+          ),
+          week_vocal_assignments (
+            id,
+            role,
+            service_day,
+            status,
+            profiles (
+              full_name
+            )
+          )
+        )
+      `,
+      )
       .eq("member_id", currentPermissions.userId);
 
-    const { data: vocalWeeks } = await supabase
+    if (instrumentError) {
+      alert(instrumentError.message);
+      return [];
+    }
+
+    const { data: vocalWeeks, error: vocalError } = await supabase
       .from("week_vocal_assignments")
-      .select("ministry_weeks (*)")
+      .select(
+        `
+        ministry_weeks (
+          *,
+          week_instrument_assignments (
+            id,
+            instrument,
+            status,
+            profiles (
+              full_name
+            )
+          ),
+          week_vocal_assignments (
+            id,
+            role,
+            service_day,
+            status,
+            profiles (
+              full_name
+            )
+          )
+        )
+      `,
+      )
       .eq("member_id", currentPermissions.userId);
 
-    const weeks = [
+    if (vocalError) {
+      alert(vocalError.message);
+      return [];
+    }
+
+    const memberWeeks = [
       ...(instrumentWeeks || []).map((item) => item.ministry_weeks),
       ...(vocalWeeks || []).map((item) => item.ministry_weeks),
-    ].filter(Boolean);
+    ].filter(Boolean) as unknown as MinistryWeek[];
 
-    const uniqueWeeks = Array.from(
-      new Map(weeks.map((week) => [week.id, week])).values(),
+    return Array.from(
+      new Map(memberWeeks.map((week) => [week.id, week])).values(),
     );
-
-    return uniqueWeeks;
   }
 
   useEffect(() => {
@@ -100,11 +215,6 @@ export default function EscalasPage() {
 
     async function loadInitialWeeks() {
       setLoadingWeeks(true);
-      const currentPermissions = await getCurrentUserPermissions();
-
-      if (!isMounted) return;
-
-      setPermissions(currentPermissions);
 
       const data = await fetchWeeks();
 
@@ -123,6 +233,12 @@ export default function EscalasPage() {
 
   async function createWeek(e: React.FormEvent) {
     e.preventDefault();
+
+    if (!permissions?.isGeneralLeader) {
+      alert("Apenas o líder geral pode criar semanas.");
+      return;
+    }
+
     setLoading(true);
 
     const sunday = new Date(sundayDate);
@@ -169,11 +285,17 @@ export default function EscalasPage() {
 
         <h1 className="text-3xl font-bold">Escalas</h1>
         <p className="mt-2 text-zinc-400">
-          Crie semanas ministeriais e organize cultos, ensaios e equipes.
+          Crie semanas ministeriais e acompanhe escalas do ministério.
         </p>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[420px_1fr]">
+      <div
+        className={
+          permissions?.isGeneralLeader
+            ? "grid gap-6 lg:grid-cols-[420px_1fr]"
+            : "grid gap-6"
+        }
+      >
         {permissions?.isGeneralLeader && (
           <Card>
             <h2 className="text-xl font-semibold">Criar semana ministerial</h2>
@@ -219,16 +341,10 @@ export default function EscalasPage() {
           </Card>
         )}
 
-        <div
-          className={
-            permissions?.isGeneralLeader
-              ? "grid gap-6 lg:grid-cols-[420px_1fr]"
-              : "grid gap-6"
-          }
-        ></div>
-
         <div className="space-y-4">
-          <h2 className="text-xl font-semibold">Semanas criadas</h2>
+          <h2 className="text-xl font-semibold">
+            {permissions?.isAnyLeader ? "Semanas criadas" : "Minhas escalas"}
+          </h2>
 
           {loadingWeeks && (
             <Card>
@@ -239,7 +355,9 @@ export default function EscalasPage() {
           {!loadingWeeks && weeks.length === 0 && (
             <Card>
               <p className="text-zinc-400">
-                Nenhuma semana ministerial criada ainda.
+                {permissions?.isAnyLeader
+                  ? "Nenhuma semana ministerial criada ainda."
+                  : "Você ainda não possui escalas."}
               </p>
             </Card>
           )}
@@ -296,10 +414,71 @@ export default function EscalasPage() {
                 </div>
 
                 {!permissions?.isAnyLeader && (
-                  <p className="text-sm text-zinc-500">
-                    Você está escalado nesta semana. Os detalhes completos
-                    aparecem em Confirmações e Repertórios.
-                  </p>
+                  <div className="space-y-4 rounded-xl border border-zinc-800 bg-zinc-950 p-4">
+                    <div>
+                      <h4 className="mb-3 font-semibold">Instrumentistas</h4>
+
+                      {week.week_instrument_assignments?.length === 0 && (
+                        <p className="text-sm text-zinc-500">
+                          Nenhum instrumentista definido.
+                        </p>
+                      )}
+
+                      <div className="grid gap-2 md:grid-cols-2">
+                        {week.week_instrument_assignments?.map((assignment) => (
+                          <div
+                            key={assignment.id}
+                            className="rounded-lg border border-zinc-800 bg-zinc-900 p-3"
+                          >
+                            <p className="font-medium">
+                              {assignment.instrument}
+                            </p>
+                            <p className="text-sm text-zinc-400">
+                              {assignment.profiles?.full_name || "-"}
+                            </p>
+                            <p className="mt-1 text-xs text-zinc-500">
+                              {assignmentStatusLabels[assignment.status] ||
+                                assignment.status}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="mb-3 font-semibold">Vozes</h4>
+
+                      {week.week_vocal_assignments?.length === 0 && (
+                        <p className="text-sm text-zinc-500">
+                          Nenhuma voz definida.
+                        </p>
+                      )}
+
+                      <div className="grid gap-2 md:grid-cols-2">
+                        {week.week_vocal_assignments?.map((assignment) => (
+                          <div
+                            key={assignment.id}
+                            className="rounded-lg border border-zinc-800 bg-zinc-900 p-3"
+                          >
+                            <p className="font-medium">
+                              {vocalRoleLabels[assignment.role] ||
+                                assignment.role}{" "}
+                              •{" "}
+                              {serviceDayLabels[assignment.service_day] ||
+                                assignment.service_day}
+                            </p>
+                            <p className="text-sm text-zinc-400">
+                              {assignment.profiles?.full_name || "-"}
+                            </p>
+                            <p className="mt-1 text-xs text-zinc-500">
+                              {assignmentStatusLabels[assignment.status] ||
+                                assignment.status}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 )}
 
                 {permissions?.isAnyLeader && (
