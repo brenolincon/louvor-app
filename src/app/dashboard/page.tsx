@@ -15,6 +15,7 @@ type Profile = {
   member_type: string | null;
   vocal_group: string | null;
   instrument: string | null;
+  ministry_role: string;
 };
 
 const statusLabels: Record<string, string> = {
@@ -34,6 +35,14 @@ const vocalGroupLabels: Record<string, string> = {
   unit: "Unit",
   ative: "Ative",
   teens: "Geração Teens",
+};
+
+const ministryRoleLabels: Record<string, string> = {
+  general_leader: "Líder geral",
+  instrument_leader: "Líder de instrumento",
+  vocal_leader: "Líder vocal",
+  minister: "Ministro",
+  member: "Integrante",
 };
 
 export default function DashboardPage() {
@@ -125,8 +134,18 @@ export default function DashboardPage() {
         </Card>
 
         <Card>
-          <p className="text-sm text-zinc-500">Tipo de integrante</p>
+          <p className="text-sm text-zinc-500">Atuação ministerial</p>
           <h2 className="mt-2 text-xl font-bold sm:text-2xl">{displayType}</h2>
+        </Card>
+
+        <Card>
+          <p className="text-sm text-zinc-500">Função no sistema</p>
+          <h2 className="mt-2 text-xl font-bold sm:text-2xl">
+            {profile?.ministry_role
+              ? ministryRoleLabels[profile.ministry_role] ||
+                profile.ministry_role
+              : "-"}
+          </h2>
         </Card>
 
         <Card>
