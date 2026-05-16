@@ -8,7 +8,6 @@ import { getCurrentUserPermissions } from "@/lib/get-current-user-permissions";
 import { AppLayout } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { DatePicker } from "@/components/ui/date-picker";
 

@@ -48,8 +48,8 @@ export function DatePicker({
             }}
             locale={ptBR}
             captionLayout="dropdown"
-            fromYear={1940}
-            toYear={new Date().getFullYear() + 5}
+            startMonth={new Date(1940, 0)}
+            endMonth={new Date(new Date().getFullYear() + 5, 11)}
             modifiersClassNames={{
               selected: "rdp-custom-selected",
               today: "rdp-custom-today",
@@ -59,7 +59,6 @@ export function DatePicker({
               dropdown: "rdp-dropdown",
               dropdowns: "flex items-center gap-2",
               caption_label: "text-sm font-semibold text-white capitalize",
-              caption: "flex items-center justify-between px-1 pb-4",
             }}
           />
         </div>
