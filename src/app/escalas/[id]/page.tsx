@@ -2,10 +2,16 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+
 import { CalendarDays } from "lucide-react";
+
 import { supabase } from "@/lib/supabase";
+import { getCurrentUserPermissions } from "@/lib/get-current-user-permissions";
+
 import { AppLayout } from "@/components/app-layout";
+
 import { Card } from "@/components/ui/card";
+
 import { InstrumentAssignmentsCard } from "@/components/weeks/instrument-assignments-card";
 import { VocalAssignmentsCard } from "@/components/weeks/vocal-assignments-card";
 
@@ -62,36 +68,72 @@ function formatDate(date: string) {
 
 export default function EscalaDetailsPage() {
   const params = useParams();
+
   const weekId = params.id as string;
 
   const [week, setWeek] = useState<Week | null>(null);
+
+  const [permissions, setPermissions] = useState<any>(null);
+
   const [instrumentalists, setInstrumentalists] = useState<MemberFunction[]>(
     [],
   );
+
   const [vocalists, setVocalists] = useState<MemberFunction[]>([]);
+
   const [instrumentAssignments, setInstrumentAssignments] = useState<
     InstrumentAssignment[]
   >([]);
+
   const [vocalAssignments, setVocalAssignments] = useState<VocalAssignment[]>(
     [],
   );
 
   const [selectedInstrument, setSelectedInstrument] = useState("");
+
   const [selectedMemberId, setSelectedMemberId] = useState("");
+
   const [selectedServiceDay, setSelectedServiceDay] = useState("");
+
   const [selectedVocalRole, setSelectedVocalRole] = useState("");
+
   const [selectedVocalistId, setSelectedVocalistId] = useState("");
 
   const [savingInstrument, setSavingInstrument] = useState(false);
+
   const [savingVocal, setSavingVocal] = useState(false);
+
   const [loading, setLoading] = useState(true);
 
   const loadWeekData = useCallback(async () => {
     setLoading(true);
 
+    const currentPermissions = await getCurrentUserPermissions();
+
+    if (!currentPermissions) {
+      setLoading(false);
+      return;
+    }
+
+    if (!currentPermissions.isAnyLeader) {
+      alert("Você não tem permissão para acessar esta página.");
+      window.location.href = "/escalas";
+      return;
+    }
+
+    setPermissions(currentPermissions);
+
     const { data: weekData, error: weekError } = await supabase
       .from("ministry_weeks")
-      .select("id, sunday_date, wednesday_date, rehearsal_date, vocal_group")
+      .select(
+        `
+          id,
+          sunday_date,
+          wednesday_date,
+          rehearsal_date,
+          vocal_group
+        `,
+      )
       .eq("id", weekId)
       .single();
 
@@ -106,19 +148,21 @@ export default function EscalaDetailsPage() {
         .from("member_functions")
         .select(
           `
+        id,
+        instrument,
+        vocal_group,
+        profiles!inner (
           id,
-          instrument,
-          vocal_group,
-          profiles!inner (
-            id,
-            full_name,
-            status
-          )
-        `,
+          full_name,
+          status
+        )
+      `,
         )
         .eq("function_type", "instrumentalist")
         .eq("profiles.status", "approved")
-        .order("instrument", { ascending: true });
+        .order("instrument", {
+          ascending: true,
+        });
 
     if (instrumentalistsError) {
       alert(instrumentalistsError.message);
@@ -143,7 +187,9 @@ export default function EscalaDetailsPage() {
       .eq("function_type", "vocalist")
       .eq("vocal_group", weekData.vocal_group)
       .eq("profiles.status", "approved")
-      .order("created_at", { ascending: true });
+      .order("created_at", {
+        ascending: true,
+      });
 
     if (vocalistsError) {
       alert(vocalistsError.message);
@@ -158,18 +204,20 @@ export default function EscalaDetailsPage() {
       .from("week_instrument_assignments")
       .select(
         `
-          id,
-          week_id,
-          member_id,
-          instrument,
-          status,
-          profiles (
-            full_name
-          )
-        `,
+        id,
+        week_id,
+        member_id,
+        instrument,
+        status,
+        profiles (
+          full_name
+        )
+      `,
       )
       .eq("week_id", weekId)
-      .order("instrument", { ascending: true });
+      .order("instrument", {
+        ascending: true,
+      });
 
     if (instrumentAssignmentsError) {
       alert(instrumentAssignmentsError.message);
@@ -182,18 +230,20 @@ export default function EscalaDetailsPage() {
         .from("week_vocal_assignments")
         .select(
           `
-          id,
-          member_id,
-          role,
-          service_day,
-          status,
-          profiles (
-            full_name
-          )
-        `,
+        id,
+        member_id,
+        role,
+        service_day,
+        status,
+        profiles (
+          full_name
+        )
+      `,
         )
         .eq("week_id", weekId)
-        .order("service_day", { ascending: true });
+        .order("service_day", {
+          ascending: true,
+        });
 
     if (vocalAssignmentsError) {
       alert(vocalAssignmentsError.message);
@@ -202,16 +252,21 @@ export default function EscalaDetailsPage() {
     }
 
     setWeek(weekData);
+
     setInstrumentalists(
       (instrumentalistsData || []) as unknown as MemberFunction[],
     );
+
     setVocalists((vocalistsData || []) as unknown as MemberFunction[]);
+
     setInstrumentAssignments(
       (instrumentAssignmentsData || []) as unknown as InstrumentAssignment[],
     );
+
     setVocalAssignments(
       (vocalAssignmentsData || []) as unknown as VocalAssignment[],
     );
+
     setLoading(false);
   }, [weekId]);
 
@@ -222,8 +277,20 @@ export default function EscalaDetailsPage() {
   async function saveInstrumentAssignment(e: React.FormEvent) {
     e.preventDefault();
 
+    const canManageAll = permissions?.isGeneralLeader;
+
+    if (
+      !canManageAll &&
+      !permissions?.instrumentsLed.includes(selectedInstrument)
+    ) {
+      alert("Você só pode escalar instrumentos que lidera.");
+
+      return;
+    }
+
     if (!selectedInstrument || !selectedMemberId) {
       alert("Selecione instrumento e músico.");
+
       return;
     }
 
@@ -233,6 +300,7 @@ export default function EscalaDetailsPage() {
 
     if (alreadyExists) {
       alert("Já existe um músico escalado para este instrumento.");
+
       return;
     }
 
@@ -256,14 +324,26 @@ export default function EscalaDetailsPage() {
 
     setSelectedInstrument("");
     setSelectedMemberId("");
+
     await loadWeekData();
   }
 
   async function saveVocalAssignment(e: React.FormEvent) {
     e.preventDefault();
 
+    const canManageVocals =
+      permissions?.isGeneralLeader ||
+      permissions?.vocalGroupsLed.includes(week?.vocal_group);
+
+    if (!canManageVocals) {
+      alert("Você não tem permissão para editar vozes nesta escala.");
+
+      return;
+    }
+
     if (!selectedServiceDay || !selectedVocalRole || !selectedVocalistId) {
       alert("Preencha todos os campos.");
+
       return;
     }
 
@@ -275,6 +355,7 @@ export default function EscalaDetailsPage() {
 
     if (selectedVocalRole === "minister" && ministerExists) {
       alert("Já existe um ministro escalado neste culto.");
+
       return;
     }
 
@@ -286,6 +367,7 @@ export default function EscalaDetailsPage() {
 
     if (selectedVocalRole === "backvocal" && backvocalCount >= 3) {
       alert("Limite máximo de 3 backs por culto.");
+
       return;
     }
 
@@ -297,6 +379,7 @@ export default function EscalaDetailsPage() {
 
     if (alreadyAssigned) {
       alert("Este vocalista já está escalado neste culto.");
+
       return;
     }
 
@@ -320,6 +403,7 @@ export default function EscalaDetailsPage() {
     setSelectedServiceDay("");
     setSelectedVocalRole("");
     setSelectedVocalistId("");
+
     await loadWeekData();
   }
 
@@ -342,6 +426,25 @@ export default function EscalaDetailsPage() {
       </AppLayout>
     );
   }
+
+  const canManageAll = permissions?.isGeneralLeader;
+
+  const canManageVocals =
+    canManageAll || permissions?.vocalGroupsLed.includes(week.vocal_group);
+
+  const instrumentsUserCanManage = canManageAll
+    ? instrumentalists.map((item) => item.instrument).filter(Boolean)
+    : permissions?.instrumentsLed || [];
+
+  const filteredInstrumentalists = canManageAll
+    ? instrumentalists
+    : instrumentalists.filter(
+        (item) =>
+          item.instrument && instrumentsUserCanManage.includes(item.instrument),
+      );
+
+  const canManageInstruments =
+    canManageAll || instrumentsUserCanManage.length > 0;
 
   return (
     <AppLayout>
@@ -366,11 +469,13 @@ export default function EscalaDetailsPage() {
 
       <div className="grid gap-5 xl:grid-cols-2">
         <InstrumentAssignmentsCard
-          instrumentalists={instrumentalists}
+          instrumentalists={filteredInstrumentalists}
           assignments={instrumentAssignments}
           selectedInstrument={selectedInstrument}
           selectedMemberId={selectedMemberId}
           saving={savingInstrument}
+          canManage={!!canManageInstruments}
+          allowedInstruments={instrumentsUserCanManage}
           onInstrumentChange={setSelectedInstrument}
           onMemberChange={setSelectedMemberId}
           onSubmit={saveInstrumentAssignment}
@@ -383,6 +488,7 @@ export default function EscalaDetailsPage() {
           selectedVocalRole={selectedVocalRole}
           selectedVocalistId={selectedVocalistId}
           saving={savingVocal}
+          canManage={!!canManageVocals}
           onServiceDayChange={setSelectedServiceDay}
           onVocalRoleChange={setSelectedVocalRole}
           onVocalistChange={setSelectedVocalistId}

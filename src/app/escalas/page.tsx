@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { getCurrentUserPermissions } from "@/lib/get-current-user-permissions";
 
 type MinistryWeek = {
   id: string;
@@ -43,23 +44,55 @@ export default function EscalasPage() {
   const [weeks, setWeeks] = useState<MinistryWeek[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingWeeks, setLoadingWeeks] = useState(true);
+  const [permissions, setPermissions] = useState<Awaited<
+    ReturnType<typeof getCurrentUserPermissions>
+  > | null>(null);
 
   function formatDateBR(date: string) {
     return new Date(date + "T00:00:00").toLocaleDateString("pt-BR");
   }
 
   async function fetchWeeks() {
-    const { data, error } = await supabase
-      .from("ministry_weeks")
-      .select("*")
-      .order("sunday_date", { ascending: false });
+    const currentPermissions = await getCurrentUserPermissions();
 
-    if (error) {
-      alert(error.message);
+    if (!currentPermissions) {
       return [];
     }
 
-    return data || [];
+    if (currentPermissions.isAnyLeader) {
+      const { data, error } = await supabase
+        .from("ministry_weeks")
+        .select("*")
+        .order("sunday_date", { ascending: false });
+
+      if (error) {
+        alert(error.message);
+        return [];
+      }
+
+      return data || [];
+    }
+
+    const { data: instrumentWeeks } = await supabase
+      .from("week_instrument_assignments")
+      .select("ministry_weeks (*)")
+      .eq("member_id", currentPermissions.userId);
+
+    const { data: vocalWeeks } = await supabase
+      .from("week_vocal_assignments")
+      .select("ministry_weeks (*)")
+      .eq("member_id", currentPermissions.userId);
+
+    const weeks = [
+      ...(instrumentWeeks || []).map((item) => item.ministry_weeks),
+      ...(vocalWeeks || []).map((item) => item.ministry_weeks),
+    ].filter(Boolean);
+
+    const uniqueWeeks = Array.from(
+      new Map(weeks.map((week) => [week.id, week])).values(),
+    );
+
+    return uniqueWeeks;
   }
 
   useEffect(() => {
@@ -67,6 +100,11 @@ export default function EscalasPage() {
 
     async function loadInitialWeeks() {
       setLoadingWeeks(true);
+      const currentPermissions = await getCurrentUserPermissions();
+
+      if (!isMounted) return;
+
+      setPermissions(currentPermissions);
 
       const data = await fetchWeeks();
 
@@ -136,48 +174,58 @@ export default function EscalasPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[420px_1fr]">
-        <Card>
-          <h2 className="text-xl font-semibold">Criar semana ministerial</h2>
-          <p className="mt-1 text-sm text-zinc-400">
-            O sistema gera automaticamente ensaio, domingo e quarta.
-          </p>
+        {permissions?.isGeneralLeader && (
+          <Card>
+            <h2 className="text-xl font-semibold">Criar semana ministerial</h2>
+            <p className="mt-1 text-sm text-zinc-400">
+              O sistema gera automaticamente ensaio, domingo e quarta.
+            </p>
 
-          <form onSubmit={createWeek} className="mt-6 space-y-4">
-            <div>
-              <label className="mb-2 block text-sm text-zinc-400">
-                Domingo da semana
-              </label>
+            <form onSubmit={createWeek} className="mt-6 space-y-4">
+              <div>
+                <label className="mb-2 block text-sm text-zinc-400">
+                  Domingo da semana
+                </label>
 
-              <Input
-                type="date"
-                value={sundayDate}
-                onChange={(e) => setSundayDate(e.target.value)}
-                required
-              />
-            </div>
+                <Input
+                  type="date"
+                  value={sundayDate}
+                  onChange={(e) => setSundayDate(e.target.value)}
+                  required
+                />
+              </div>
 
-            <div>
-              <label className="mb-2 block text-sm text-zinc-400">
-                Grupo vocal responsável
-              </label>
+              <div>
+                <label className="mb-2 block text-sm text-zinc-400">
+                  Grupo vocal responsável
+                </label>
 
-              <Select
-                value={vocalGroup}
-                onChange={(e) => setVocalGroup(e.target.value)}
-                required
-              >
-                <option value="">Selecione</option>
-                <option value="unit">Unit</option>
-                <option value="ative">Ative</option>
-                <option value="teens">Geração Teens</option>
-              </Select>
-            </div>
+                <Select
+                  value={vocalGroup}
+                  onChange={(e) => setVocalGroup(e.target.value)}
+                  required
+                >
+                  <option value="">Selecione</option>
+                  <option value="unit">Unit</option>
+                  <option value="ative">Ative</option>
+                  <option value="teens">Geração Teens</option>
+                </Select>
+              </div>
 
-            <Button disabled={loading} className="w-full">
-              {loading ? "Criando..." : "Criar semana"}
-            </Button>
-          </form>
-        </Card>
+              <Button disabled={loading} className="w-full">
+                {loading ? "Criando..." : "Criar semana"}
+              </Button>
+            </form>
+          </Card>
+        )}
+
+        <div
+          className={
+            permissions?.isGeneralLeader
+              ? "grid gap-6 lg:grid-cols-[420px_1fr]"
+              : "grid gap-6"
+          }
+        ></div>
 
         <div className="space-y-4">
           <h2 className="text-xl font-semibold">Semanas criadas</h2>
@@ -247,12 +295,21 @@ export default function EscalasPage() {
                   </div>
                 </div>
 
-                <Link
-                  href={`/escalas/${week.id}`}
-                  className="inline-flex rounded-xl bg-violet-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-violet-500"
-                >
-                  Abrir semana
-                </Link>
+                {!permissions?.isAnyLeader && (
+                  <p className="text-sm text-zinc-500">
+                    Você está escalado nesta semana. Os detalhes completos
+                    aparecem em Confirmações e Repertórios.
+                  </p>
+                )}
+
+                {permissions?.isAnyLeader && (
+                  <Link
+                    href={`/escalas/${week.id}`}
+                    className="inline-flex rounded-xl bg-violet-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-violet-500"
+                  >
+                    Abrir semana
+                  </Link>
+                )}
               </Card>
             ))}
         </div>
