@@ -277,20 +277,14 @@ export default function EscalaDetailsPage() {
   async function saveInstrumentAssignment(e: React.FormEvent) {
     e.preventDefault();
 
-    const canManageAll = permissions?.isGeneralLeader;
+    const canManageAll = permissions?.isGeneralLeader === true;
 
-    if (
-      !canManageAll &&
-      !permissions?.instrumentsLed.includes(selectedInstrument)
-    ) {
+    const canManageThisInstrument =
+      canManageAll ||
+      permissions?.instrumentsLed?.includes(selectedInstrument) === true;
+
+    if (!canManageThisInstrument) {
       alert("Você só pode escalar instrumentos que lidera.");
-
-      return;
-    }
-
-    if (!selectedInstrument || !selectedMemberId) {
-      alert("Selecione instrumento e músico.");
-
       return;
     }
 
@@ -339,7 +333,6 @@ export default function EscalaDetailsPage() {
 
     if (!canManageVocals) {
       alert("Você não tem permissão para editar vozes nesta escala.");
-
       return;
     }
 
@@ -429,27 +422,31 @@ export default function EscalaDetailsPage() {
     );
   }
 
-  const canManageAll = permissions?.isGeneralLeader;
+  const canManageAll = permissions?.isGeneralLeader === true;
 
   const canManageVocals =
-    permissions?.isGeneralLeader === true ||
-    (week?.vocal_group !== undefined &&
-      week?.vocal_group !== null &&
-      permissions?.vocalGroupsLed?.includes(week.vocal_group) === true);
+    canManageAll ||
+    permissions?.vocalGroupsLed?.includes(week.vocal_group) === true;
+
+  const userLedInstruments = permissions?.instrumentsLed || [];
+
+  const canManageInstruments = canManageAll || userLedInstruments.length > 0;
 
   const instrumentsUserCanManage = canManageAll
-    ? instrumentalists.map((item) => item.instrument).filter(Boolean)
-    : permissions?.instrumentsLed || [];
-
-  const filteredInstrumentalists = canManageAll
     ? instrumentalists
-    : instrumentalists.filter(
-        (item) =>
-          item.instrument && instrumentsUserCanManage.includes(item.instrument),
-      );
+        .map((item) => item.instrument)
+        .filter((instrument): instrument is string => Boolean(instrument))
+    : userLedInstruments;
 
-  const canManageInstruments =
-    canManageAll || instrumentsUserCanManage.length > 0;
+  const filteredInstrumentalists = canManageInstruments
+    ? canManageAll
+      ? instrumentalists
+      : instrumentalists.filter(
+          (item) =>
+            item.instrument !== null &&
+            instrumentsUserCanManage.includes(item.instrument),
+        )
+    : [];
 
   return (
     <AppLayout>
