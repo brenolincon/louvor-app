@@ -1,13 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
-import { CalendarDays, Music, Users, Mic2 } from "lucide-react";
+import { CalendarDays, Music } from "lucide-react";
 
 import { supabase } from "@/lib/supabase";
-
 import { AppLayout } from "@/components/app-layout";
-import { Card } from "@/components/ui/card";
+
+import { WeekHeader } from "@/components/weeks/week-header";
+import { WeekSummaryCards } from "@/components/weeks/week-summary-cards";
+import { InstrumentAssignmentsCard } from "@/components/weeks/instrument-assignments-card";
+import { VocalAssignmentsCard } from "@/components/weeks/vocal-assignments-card";
+import { WeekPlaceholderCard } from "@/components/weeks/week-placeholder-card";
 
 type MinistryWeek = {
   id: string;
@@ -42,18 +46,24 @@ type InstrumentAssignment = {
     | null;
 };
 
-const vocalGroupLabels: Record<string, string> = {
-  unit: "Unit",
-  ative: "Ative",
-  teens: "Geração Teens",
+type Vocalist = {
+  id: string;
+  full_name: string;
+  vocal_role: string | null;
+  vocal_group: string | null;
 };
 
-const statusLabels: Record<string, string> = {
-  draft: "Rascunho",
-  building: "Montando",
-  waiting_repertoire: "Aguardando repertório",
-  waiting_approval: "Aguardando aprovação",
-  published: "Publicada",
+type VocalAssignment = {
+  id: string;
+  member_id: string;
+  role: string;
+  service_day: string;
+  status: string;
+  profiles:
+    | {
+        full_name: string;
+      }[]
+    | null;
 };
 
 export default function WeekDetailsPage() {
@@ -61,44 +71,28 @@ export default function WeekDetailsPage() {
   const weekId = params.id as string;
 
   const [week, setWeek] = useState<MinistryWeek | null>(null);
-
   const [loading, setLoading] = useState(true);
 
   const [instrumentalists, setInstrumentalists] = useState<Profile[]>([]);
-
   const [instrumentAssignments, setInstrumentAssignments] = useState<
     InstrumentAssignment[]
   >([]);
 
   const [selectedInstrument, setSelectedInstrument] = useState("");
-
   const [selectedMemberId, setSelectedMemberId] = useState("");
-
   const [savingInstrument, setSavingInstrument] = useState(false);
 
-  function formatDateBR(date: string) {
-    return new Date(date + "T00:00:00").toLocaleDateString("pt-BR");
-  }
+  const [vocalists, setVocalists] = useState<Vocalist[]>([]);
+  const [vocalAssignments, setVocalAssignments] = useState<VocalAssignment[]>(
+    [],
+  );
 
-  async function loadInstrumentalists() {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("id, full_name, instrument, status, member_type")
-      .eq("member_type", "instrumentalist")
-      .eq("status", "approved")
-      .order("full_name", {
-        ascending: true,
-      });
+  const [selectedServiceDay, setSelectedServiceDay] = useState("");
+  const [selectedVocalRole, setSelectedVocalRole] = useState("");
+  const [selectedVocalistId, setSelectedVocalistId] = useState("");
+  const [savingVocal, setSavingVocal] = useState(false);
 
-    if (error) {
-      alert(error.message);
-      return [];
-    }
-
-    return data || [];
-  }
-
-  async function loadInstrumentAssignments() {
+  const fetchInstrumentAssignments = useCallback(async () => {
     const { data, error } = await supabase
       .from("week_instrument_assignments")
       .select(
@@ -114,9 +108,7 @@ export default function WeekDetailsPage() {
       `,
       )
       .eq("week_id", weekId)
-      .order("instrument", {
-        ascending: true,
-      });
+      .order("instrument", { ascending: true });
 
     if (error) {
       alert(error.message);
@@ -124,7 +116,32 @@ export default function WeekDetailsPage() {
     }
 
     return data || [];
-  }
+  }, [weekId]);
+
+  const fetchVocalAssignments = useCallback(async () => {
+    const { data, error } = await supabase
+      .from("week_vocal_assignments")
+      .select(
+        `
+        id,
+        member_id,
+        role,
+        service_day,
+        status,
+        profiles (
+          full_name
+        )
+      `,
+      )
+      .eq("week_id", weekId);
+
+    if (error) {
+      alert(error.message);
+      return [];
+    }
+
+    return data || [];
+  }, [weekId]);
 
   async function saveInstrumentAssignment(e: React.FormEvent) {
     e.preventDefault();
@@ -158,9 +175,41 @@ export default function WeekDetailsPage() {
     setSelectedInstrument("");
     setSelectedMemberId("");
 
-    const updatedAssignments = await loadInstrumentAssignments();
-
+    const updatedAssignments = await fetchInstrumentAssignments();
     setInstrumentAssignments(updatedAssignments);
+  }
+
+  async function saveVocalAssignment(e: React.FormEvent) {
+    e.preventDefault();
+
+    if (!selectedServiceDay || !selectedVocalRole || !selectedVocalistId) {
+      alert("Preencha todos os campos.");
+      return;
+    }
+
+    setSavingVocal(true);
+
+    const { error } = await supabase.from("week_vocal_assignments").insert({
+      week_id: weekId,
+      member_id: selectedVocalistId,
+      role: selectedVocalRole,
+      service_day: selectedServiceDay,
+      status: "pending",
+    });
+
+    setSavingVocal(false);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setSelectedServiceDay("");
+    setSelectedVocalRole("");
+    setSelectedVocalistId("");
+
+    const updatedAssignments = await fetchVocalAssignments();
+    setVocalAssignments(updatedAssignments);
   }
 
   useEffect(() => {
@@ -169,7 +218,7 @@ export default function WeekDetailsPage() {
     async function loadWeekData() {
       setLoading(true);
 
-      const { data, error } = await supabase
+      const { data: weekData, error: weekError } = await supabase
         .from("ministry_weeks")
         .select("*")
         .eq("id", weekId)
@@ -177,8 +226,8 @@ export default function WeekDetailsPage() {
 
       if (!isMounted) return;
 
-      if (error) {
-        alert(error.message);
+      if (weekError) {
+        alert(weekError.message);
         setLoading(false);
         return;
       }
@@ -189,9 +238,7 @@ export default function WeekDetailsPage() {
           .select("id, full_name, instrument, status, member_type")
           .eq("member_type", "instrumentalist")
           .eq("status", "approved")
-          .order("full_name", {
-            ascending: true,
-          });
+          .order("full_name", { ascending: true });
 
       if (!isMounted) return;
 
@@ -201,39 +248,32 @@ export default function WeekDetailsPage() {
         return;
       }
 
-      const { data: assignmentsData, error: assignmentsError } = await supabase
-        .from("week_instrument_assignments")
-        .select(
-          `
-          id,
-          week_id,
-          member_id,
-          instrument,
-          status,
-          profiles (
-            full_name
-          )
-        `,
-        )
-        .eq("week_id", weekId)
-        .order("instrument", {
-          ascending: true,
-        });
+      const { data: vocalistsData, error: vocalistsError } = await supabase
+        .from("profiles")
+        .select("id, full_name, vocal_role, vocal_group")
+        .eq("member_type", "vocalist")
+        .eq("status", "approved")
+        .eq("vocal_group", weekData.vocal_group)
+        .order("full_name", { ascending: true });
 
       if (!isMounted) return;
 
-      if (assignmentsError) {
-        alert(assignmentsError.message);
+      if (vocalistsError) {
+        alert(vocalistsError.message);
         setLoading(false);
         return;
       }
 
-      setWeek(data);
+      const instrumentAssignmentsData = await fetchInstrumentAssignments();
+      const vocalAssignmentsData = await fetchVocalAssignments();
 
+      if (!isMounted) return;
+
+      setWeek(weekData);
       setInstrumentalists(instrumentalistsData || []);
-
-      setInstrumentAssignments(assignmentsData || []);
-
+      setVocalists(vocalistsData || []);
+      setInstrumentAssignments(instrumentAssignmentsData);
+      setVocalAssignments(vocalAssignmentsData);
       setLoading(false);
     }
 
@@ -244,7 +284,7 @@ export default function WeekDetailsPage() {
     return () => {
       isMounted = false;
     };
-  }, [weekId]);
+  }, [weekId, fetchInstrumentAssignments, fetchVocalAssignments]);
 
   if (loading) {
     return (
@@ -264,177 +304,58 @@ export default function WeekDetailsPage() {
 
   return (
     <AppLayout>
-      <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-600">
-            <CalendarDays size={24} />
-          </div>
+      <WeekHeader
+        sundayDate={week.sunday_date}
+        wednesdayDate={week.wednesday_date}
+        vocalGroup={week.vocal_group}
+        status={week.status}
+      />
 
-          <h1 className="text-3xl font-bold">
-            Semana {formatDateBR(week.sunday_date)} a{" "}
-            {formatDateBR(week.wednesday_date)}
-          </h1>
-
-          <p className="mt-2 text-zinc-400">
-            Grupo vocal responsável: {vocalGroupLabels[week.vocal_group]}
-          </p>
-        </div>
-
-        <span className="w-fit rounded-full border border-violet-500/30 bg-violet-500/10 px-4 py-2 text-sm text-violet-300">
-          {statusLabels[week.status]}
-        </span>
-      </div>
-
-      <div className="mb-6 grid gap-4 md:grid-cols-3">
-        <Card>
-          <p className="text-sm text-zinc-500">Ensaio</p>
-
-          <h2 className="mt-2 text-xl font-semibold">
-            {formatDateBR(week.rehearsal_date)}
-          </h2>
-
-          <p className="text-zinc-400">{week.rehearsal_time}</p>
-        </Card>
-
-        <Card>
-          <p className="text-sm text-zinc-500">Culto domingo</p>
-
-          <h2 className="mt-2 text-xl font-semibold">
-            {formatDateBR(week.sunday_date)}
-          </h2>
-
-          <p className="text-zinc-400">{week.sunday_time}</p>
-        </Card>
-
-        <Card>
-          <p className="text-sm text-zinc-500">Culto quarta</p>
-
-          <h2 className="mt-2 text-xl font-semibold">
-            {formatDateBR(week.wednesday_date)}
-          </h2>
-
-          <p className="text-zinc-400">{week.wednesday_time}</p>
-        </Card>
-      </div>
+      <WeekSummaryCards
+        rehearsalDate={week.rehearsal_date}
+        rehearsalTime={week.rehearsal_time}
+        sundayDate={week.sunday_date}
+        sundayTime={week.sunday_time}
+        wednesdayDate={week.wednesday_date}
+        wednesdayTime={week.wednesday_time}
+      />
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <div className="mb-4 flex items-center gap-3">
-            <Users className="text-violet-400" size={22} />
+        <InstrumentAssignmentsCard
+          instrumentalists={instrumentalists}
+          assignments={instrumentAssignments}
+          selectedInstrument={selectedInstrument}
+          selectedMemberId={selectedMemberId}
+          saving={savingInstrument}
+          onInstrumentChange={setSelectedInstrument}
+          onMemberChange={setSelectedMemberId}
+          onSubmit={saveInstrumentAssignment}
+        />
 
-            <h2 className="text-xl font-semibold">Instrumentistas</h2>
-          </div>
+        <VocalAssignmentsCard
+          vocalists={vocalists}
+          assignments={vocalAssignments}
+          selectedServiceDay={selectedServiceDay}
+          selectedVocalRole={selectedVocalRole}
+          selectedVocalistId={selectedVocalistId}
+          saving={savingVocal}
+          onServiceDayChange={setSelectedServiceDay}
+          onVocalRoleChange={setSelectedVocalRole}
+          onVocalistChange={setSelectedVocalistId}
+          onSubmit={saveVocalAssignment}
+        />
 
-          <form onSubmit={saveInstrumentAssignment} className="space-y-3">
-            <select
-              className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm text-white"
-              value={selectedInstrument}
-              onChange={(e) => setSelectedInstrument(e.target.value)}
-              required
-            >
-              <option value="">Instrumento</option>
+        <WeekPlaceholderCard
+          title="Repertório"
+          description="Em breve o ministro poderá enviar o repertório."
+          icon={Music}
+        />
 
-              {[...new Set(instrumentalists.map((member) => member.instrument))]
-                .filter(Boolean)
-                .map((instrument) => (
-                  <option key={instrument} value={instrument || ""}>
-                    {instrument}
-                  </option>
-                ))}
-            </select>
-
-            <select
-              className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm text-white"
-              value={selectedMemberId}
-              onChange={(e) => setSelectedMemberId(e.target.value)}
-              required
-            >
-              <option value="">Músico</option>
-
-              {instrumentalists
-                .filter((member) =>
-                  selectedInstrument
-                    ? member.instrument === selectedInstrument
-                    : true,
-                )
-                .map((member) => (
-                  <option key={member.id} value={member.id}>
-                    {member.full_name}
-                  </option>
-                ))}
-            </select>
-
-            <button
-              disabled={savingInstrument}
-              className="w-full rounded-xl bg-violet-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-violet-500 disabled:opacity-50"
-            >
-              {savingInstrument ? "Salvando..." : "Salvar instrumentista"}
-            </button>
-          </form>
-
-          <div className="mt-5 space-y-2">
-            {instrumentAssignments.length === 0 && (
-              <p className="text-sm text-zinc-500">
-                Nenhum instrumentista definido ainda.
-              </p>
-            )}
-
-            {instrumentAssignments.map((assignment) => (
-              <div
-                key={assignment.id}
-                className="flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-950 p-3"
-              >
-                <div>
-                  <p className="font-medium">{assignment.instrument}</p>
-
-                  <p className="text-sm text-zinc-400">
-                    {assignment.profiles?.[0]?.full_name}
-                  </p>
-                </div>
-
-                <span className="rounded-full border border-zinc-700 px-3 py-1 text-xs text-zinc-400">
-                  {assignment.status}
-                </span>
-              </div>
-            ))}
-          </div>
-        </Card>
-
-        <Card>
-          <div className="mb-4 flex items-center gap-3">
-            <Mic2 className="text-violet-400" size={22} />
-
-            <h2 className="text-xl font-semibold">Vozes</h2>
-          </div>
-
-          <p className="text-zinc-400">
-            Em breve você poderá definir ministro e backs.
-          </p>
-        </Card>
-
-        <Card>
-          <div className="mb-4 flex items-center gap-3">
-            <Music className="text-violet-400" size={22} />
-
-            <h2 className="text-xl font-semibold">Repertório</h2>
-          </div>
-
-          <p className="text-zinc-400">
-            Em breve o ministro poderá enviar o repertório.
-          </p>
-        </Card>
-
-        <Card>
-          <div className="mb-4 flex items-center gap-3">
-            <CalendarDays className="text-violet-400" size={22} />
-
-            <h2 className="text-xl font-semibold">Confirmações</h2>
-          </div>
-
-          <p className="text-zinc-400">
-            Em breve os integrantes confirmarão presença.
-          </p>
-        </Card>
+        <WeekPlaceholderCard
+          title="Confirmações"
+          description="Em breve os integrantes confirmarão presença."
+          icon={CalendarDays}
+        />
       </div>
     </AppLayout>
   );
