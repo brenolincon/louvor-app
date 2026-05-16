@@ -122,12 +122,15 @@ export function MemberDetailsModal({
 
     setLoading(true);
 
-    const { error } = await supabase.from("member_leaderships").insert({
-      member_id: member.id,
-      leadership_type: leadershipTypeValue,
-      vocal_group: vocalGroupValue,
-      instrument: instrumentValue,
-    });
+    const { data, error } = await supabase
+      .from("member_leaderships")
+      .insert({
+        member_id: member.id,
+        leadership_type: leadershipTypeValue,
+        vocal_group: vocalGroupValue,
+        instrument: instrumentValue,
+      })
+      .select();
 
     setLoading(false);
 
@@ -136,7 +139,9 @@ export function MemberDetailsModal({
       return;
     }
 
-    onUpdated();
+    console.log("Liderança criada:", data);
+
+    await onUpdated();
   }
 
   async function removeLeadership(leadershipId: string) {

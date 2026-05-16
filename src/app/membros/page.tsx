@@ -7,6 +7,7 @@ import { AppLayout } from "@/components/app-layout";
 import { Card } from "@/components/ui/card";
 import { MemberCard } from "@/components/members/member-card";
 import { MemberDetailsModal } from "@/components/members/member-details-modal";
+import { getCurrentUserPermissions } from "@/lib/get-current-user-permissions";
 
 type MemberFunction = {
   id: string;
@@ -38,6 +39,7 @@ export default function MembrosPage() {
   const [members, setMembers] = useState<Profile[]>([]);
   const [selectedMember, setSelectedMember] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [canManageMembers, setCanManageMembers] = useState(false);
 
   async function fetchMembers() {
     const { data, error } = await supabase
@@ -94,6 +96,8 @@ export default function MembrosPage() {
     async function loadMembers() {
       setLoading(true);
 
+      const permissions = await getCurrentUserPermissions();
+      setCanManageMembers(!!permissions?.isGeneralLeader);
       const data = await fetchMembers();
 
       if (!isMounted) return;
@@ -140,18 +144,24 @@ export default function MembrosPage() {
             <MemberCard
               key={member.id}
               member={member}
-              onClick={() => setSelectedMember(member)}
+              onClick={() => {
+                if (canManageMembers) {
+                  setSelectedMember(member);
+                }
+              }}
             />
           ))}
         </div>
       )}
 
-      <MemberDetailsModal
-        open={!!selectedMember}
-        member={selectedMember}
-        onClose={() => setSelectedMember(null)}
-        onUpdated={refreshMembers}
-      />
+      {canManageMembers && (
+        <MemberDetailsModal
+          open={!!selectedMember}
+          member={selectedMember}
+          onClose={() => setSelectedMember(null)}
+          onUpdated={refreshMembers}
+        />
+      )}
     </AppLayout>
   );
 }
