@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
-import { CalendarDays } from "lucide-react";
 
 import { supabase } from "@/lib/supabase";
 import { AppLayout } from "@/components/app-layout";
@@ -11,8 +10,9 @@ import { WeekHeader } from "@/components/weeks/week-header";
 import { WeekSummaryCards } from "@/components/weeks/week-summary-cards";
 import { InstrumentAssignmentsCard } from "@/components/weeks/instrument-assignments-card";
 import { VocalAssignmentsCard } from "@/components/weeks/vocal-assignments-card";
-import { WeekPlaceholderCard } from "@/components/weeks/week-placeholder-card";
+
 import { RepertoireCard } from "@/components/weeks/repertoire-card";
+import { ConfirmationsCard } from "@/components/weeks/confirmations-card";
 
 type RepertoireSong = {
   id: string;
@@ -432,6 +432,41 @@ export default function WeekDetailsPage() {
     setRepertoires(updatedRepertoires);
   }
 
+  async function updateInstrumentConfirmation(
+    assignmentId: string,
+    status: string,
+  ) {
+    const { error } = await supabase
+      .from("week_instrument_assignments")
+      .update({ status })
+      .eq("id", assignmentId);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    const updatedAssignments = await fetchInstrumentAssignments();
+
+    setInstrumentAssignments(updatedAssignments);
+  }
+
+  async function updateVocalConfirmation(assignmentId: string, status: string) {
+    const { error } = await supabase
+      .from("week_vocal_assignments")
+      .update({ status })
+      .eq("id", assignmentId);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    const updatedAssignments = await fetchVocalAssignments();
+
+    setVocalAssignments(updatedAssignments);
+  }
+
   return (
     <AppLayout>
       <WeekHeader
@@ -491,11 +526,33 @@ export default function WeekDetailsPage() {
           onSubmit={saveRepertoireSong}
         />
 
-        <WeekPlaceholderCard
-          title="Confirmações"
-          description="Em breve os integrantes confirmarão presença."
-          icon={CalendarDays}
-        />
+        <div className="space-y-4">
+          <ConfirmationsCard
+            title="Confirmações Instrumentistas"
+            assignments={instrumentAssignments.map((assignment) => ({
+              id: assignment.id,
+              role: assignment.instrument,
+              instrument: assignment.instrument,
+              status: assignment.status,
+              profiles: assignment.profiles,
+            }))}
+            onConfirm={(id) => updateInstrumentConfirmation(id, "confirmed")}
+            onDecline={(id) => updateInstrumentConfirmation(id, "declined")}
+          />
+
+          <ConfirmationsCard
+            title="Confirmações Vozes"
+            assignments={vocalAssignments.map((assignment) => ({
+              id: assignment.id,
+              role: assignment.role === "minister" ? "Ministro" : "Backvocal",
+              service_day: assignment.service_day,
+              status: assignment.status,
+              profiles: assignment.profiles,
+            }))}
+            onConfirm={(id) => updateVocalConfirmation(id, "confirmed")}
+            onDecline={(id) => updateVocalConfirmation(id, "declined")}
+          />
+        </div>
       </div>
     </AppLayout>
   );
