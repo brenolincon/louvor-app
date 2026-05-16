@@ -18,9 +18,7 @@ type VocalAssignment = {
   service_day: string;
   status: string;
   profiles: {
-    id: string;
     full_name: string;
-    status: string;
   } | null;
 };
 
@@ -31,6 +29,7 @@ type Props = {
   selectedVocalRole: string;
   selectedVocalistId: string;
   saving: boolean;
+  canManage: boolean;
   onServiceDayChange: (value: string) => void;
   onVocalRoleChange: (value: string) => void;
   onVocalistChange: (value: string) => void;
@@ -44,6 +43,7 @@ export function VocalAssignmentsCard({
   selectedVocalRole,
   selectedVocalistId,
   saving,
+  canManage,
   onServiceDayChange,
   onVocalRoleChange,
   onVocalistChange,
@@ -56,57 +56,65 @@ export function VocalAssignmentsCard({
         <h2 className="text-xl font-semibold">Vozes</h2>
       </div>
 
-      <form onSubmit={onSubmit} className="space-y-3">
-        <select
-          className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm text-white"
-          value={selectedServiceDay}
-          onChange={(e) => onServiceDayChange(e.target.value)}
-          required
-        >
-          <option value="">Culto</option>
-          <option value="sunday">Domingo</option>
-          <option value="wednesday">Quarta</option>
-        </select>
+      {!canManage && (
+        <p className="mb-4 text-sm text-zinc-500">
+          Você possui apenas permissão de visualização.
+        </p>
+      )}
 
-        <select
-          className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm text-white"
-          value={selectedVocalRole}
-          onChange={(e) => onVocalRoleChange(e.target.value)}
-          required
-        >
-          <option value="">Função na escala</option>
-          <option value="minister">Ministro</option>
-          <option value="backvocal">Backvocal</option>
-        </select>
+      {canManage && (
+        <form onSubmit={onSubmit} className="space-y-3">
+          <select
+            className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm text-white"
+            value={selectedServiceDay}
+            onChange={(e) => onServiceDayChange(e.target.value)}
+            required
+          >
+            <option value="">Culto</option>
+            <option value="sunday">Domingo</option>
+            <option value="wednesday">Quarta</option>
+          </select>
 
-        <select
-          className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm text-white"
-          value={selectedVocalistId}
-          onChange={(e) => onVocalistChange(e.target.value)}
-          required
-        >
-          <option value="">Vocalista</option>
+          <select
+            className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm text-white"
+            value={selectedVocalRole}
+            onChange={(e) => onVocalRoleChange(e.target.value)}
+            required
+          >
+            <option value="">Função na escala</option>
+            <option value="minister">Ministro</option>
+            <option value="backvocal">Backvocal</option>
+          </select>
 
-          {vocalists.map((vocalist) => {
-            const profile = vocalist.profiles;
+          <select
+            className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm text-white"
+            value={selectedVocalistId}
+            onChange={(e) => onVocalistChange(e.target.value)}
+            required
+          >
+            <option value="">Vocalista</option>
 
-            if (!profile) return null;
+            {vocalists.map((vocalist) => {
+              const profile = vocalist.profiles;
 
-            return (
-              <option key={vocalist.id} value={profile.id}>
-                {profile.full_name}
-              </option>
-            );
-          })}
-        </select>
+              if (!profile) return null;
 
-        <button
-          disabled={saving}
-          className="w-full rounded-xl bg-violet-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-violet-500 disabled:opacity-50"
-        >
-          {saving ? "Salvando..." : "Salvar voz"}
-        </button>
-      </form>
+              return (
+                <option key={vocalist.id} value={profile.id}>
+                  {profile.full_name}
+                </option>
+              );
+            })}
+          </select>
+
+          <button
+            disabled={saving}
+            className="w-full rounded-xl bg-violet-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-violet-500 disabled:opacity-50"
+          >
+            {saving ? "Salvando..." : "Salvar voz"}
+          </button>
+        </form>
+      )}
 
       <div className="mt-5 space-y-2">
         {assignments.length === 0 && (

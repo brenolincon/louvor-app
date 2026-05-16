@@ -332,8 +332,10 @@ export default function EscalaDetailsPage() {
     e.preventDefault();
 
     const canManageVocals =
-      permissions?.isGeneralLeader ||
-      permissions?.vocalGroupsLed.includes(week?.vocal_group);
+      permissions?.isGeneralLeader === true ||
+      (week?.vocal_group !== undefined &&
+        week?.vocal_group !== null &&
+        permissions?.vocalGroupsLed?.includes(week.vocal_group) === true);
 
     if (!canManageVocals) {
       alert("Você não tem permissão para editar vozes nesta escala.");
@@ -430,7 +432,10 @@ export default function EscalaDetailsPage() {
   const canManageAll = permissions?.isGeneralLeader;
 
   const canManageVocals =
-    canManageAll || permissions?.vocalGroupsLed.includes(week.vocal_group);
+    permissions?.isGeneralLeader === true ||
+    (week?.vocal_group !== undefined &&
+      week?.vocal_group !== null &&
+      permissions?.vocalGroupsLed?.includes(week.vocal_group) === true);
 
   const instrumentsUserCanManage = canManageAll
     ? instrumentalists.map((item) => item.instrument).filter(Boolean)
