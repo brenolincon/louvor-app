@@ -7,7 +7,6 @@ import { supabase } from "@/lib/supabase";
 import { getProfile } from "@/lib/get-profile";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
 
 export default function CompletarPerfilPage() {
@@ -16,10 +15,22 @@ export default function CompletarPerfilPage() {
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [birthDate, setBirthDate] = useState("");
-  const [memberType, setMemberType] = useState("");
-  const [vocalRole, setVocalRole] = useState("");
-  const [instrument, setInstrument] = useState("");
+
+  const [isVocalist, setIsVocalist] = useState(false);
+  const [isInstrumentalist, setIsInstrumentalist] = useState(false);
+  const [selectedInstruments, setSelectedInstruments] = useState<string[]>([]);
+
   const [loading, setLoading] = useState(false);
+
+  const instruments = ["Bateria", "Baixo", "Teclado", "Violão", "Guitarra"];
+
+  function toggleInstrument(instrument: string) {
+    setSelectedInstruments((current) =>
+      current.includes(instrument)
+        ? current.filter((item) => item !== instrument)
+        : [...current, instrument],
+    );
+  }
 
   function getVocalGroup(date: string) {
     const birth = new Date(date);
@@ -41,6 +52,17 @@ export default function CompletarPerfilPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    if (!isVocalist && !isInstrumentalist) {
+      alert("Selecione pelo menos uma função ministerial.");
+      return;
+    }
+
+    if (isInstrumentalist && selectedInstruments.length === 0) {
+      alert("Selecione pelo menos um instrumento.");
+      return;
+    }
+
     setLoading(true);
 
     const { data: sessionData } = await supabase.auth.getSession();
@@ -60,26 +82,70 @@ export default function CompletarPerfilPage() {
       return;
     }
 
-    const vocalGroup =
-      memberType === "vocalist" ? getVocalGroup(birthDate) : null;
+    const vocalGroup = isVocalist ? getVocalGroup(birthDate) : null;
 
-    const { error } = await supabase.from("profiles").insert({
+    if (isVocalist && !vocalGroup) {
+      setLoading(false);
+      alert("A idade mínima para cadastro vocal é 13 anos.");
+      return;
+    }
+
+    const { error: profileError } = await supabase.from("profiles").insert({
       id: user.id,
       full_name: fullName,
       phone,
       birth_date: birthDate,
-      member_type: memberType,
-      vocal_role: memberType === "vocalist" ? vocalRole : null,
+
+      // Mantemos esses campos antigos só para compatibilidade temporária.
+      member_type: isVocalist
+        ? "vocalist"
+        : isInstrumentalist
+          ? "instrumentalist"
+          : null,
+      vocal_role: null,
       vocal_group: vocalGroup,
-      instrument: memberType === "instrumentalist" ? instrument : null,
+      instrument: isInstrumentalist ? selectedInstruments.join(", ") : null,
+
       status: "pending",
       ministry_role: "member",
     });
 
+    if (profileError) {
+      setLoading(false);
+      alert(profileError.message);
+      return;
+    }
+
+    const functionsToInsert = [];
+
+    if (isVocalist) {
+      functionsToInsert.push({
+        member_id: user.id,
+        function_type: "vocalist",
+        vocal_group: vocalGroup,
+        instrument: null,
+      });
+    }
+
+    if (isInstrumentalist) {
+      selectedInstruments.forEach((instrument) => {
+        functionsToInsert.push({
+          member_id: user.id,
+          function_type: "instrumentalist",
+          vocal_group: null,
+          instrument,
+        });
+      });
+    }
+
+    const { error: functionsError } = await supabase
+      .from("member_functions")
+      .insert(functionsToInsert);
+
     setLoading(false);
 
-    if (error) {
-      alert(error.message);
+    if (functionsError) {
+      alert(functionsError.message);
       return;
     }
 
@@ -101,59 +167,105 @@ export default function CompletarPerfilPage() {
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-2">
-            <Input
-              placeholder="Nome completo"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              required
-            />
-
-            <Input
-              placeholder="Telefone"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-            />
-
-            <Input
-              type="date"
-              value={birthDate}
-              onChange={(e) => setBirthDate(e.target.value)}
-              required
-            />
-
-            <Select
-              value={memberType}
-              onChange={(e) => setMemberType(e.target.value)}
-              required
-            >
-              <option value="">Tipo de integrante</option>
-              <option value="vocalist">Cantor</option>
-              <option value="instrumentalist">Instrumentista</option>
-            </Select>
-
-            {memberType === "vocalist" && (
-              <Select
-                value={vocalRole}
-                onChange={(e) => setVocalRole(e.target.value)}
-                required
-              >
-                <option value="">Função vocal</option>
-                <option value="minister">Ministro</option>
-                <option value="backvocal">Backvocal</option>
-              </Select>
-            )}
-
-            {memberType === "instrumentalist" && (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
               <Input
-                placeholder="Instrumento"
-                value={instrument}
-                onChange={(e) => setInstrument(e.target.value)}
+                placeholder="Nome completo"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
                 required
               />
+
+              <Input
+                placeholder="Telefone"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+              />
+
+              <Input
+                type="date"
+                value={birthDate}
+                onChange={(e) => setBirthDate(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
+              <p className="mb-3 text-sm font-medium text-zinc-300">
+                Funções ministeriais
+              </p>
+
+              <div className="space-y-3">
+                <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-900 p-4">
+                  <input
+                    type="checkbox"
+                    checked={isVocalist}
+                    onChange={(e) => setIsVocalist(e.target.checked)}
+                    className="h-4 w-4"
+                  />
+
+                  <div>
+                    <p className="font-medium">Sou cantor</p>
+                    <p className="text-sm text-zinc-500">
+                      O grupo vocal será definido automaticamente pela idade.
+                    </p>
+                  </div>
+                </label>
+
+                <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-900 p-4">
+                  <input
+                    type="checkbox"
+                    checked={isInstrumentalist}
+                    onChange={(e) => setIsInstrumentalist(e.target.checked)}
+                    className="h-4 w-4"
+                  />
+
+                  <div>
+                    <p className="font-medium">Sou instrumentista</p>
+                    <p className="text-sm text-zinc-500">
+                      Informe seu instrumento principal.
+                    </p>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            {isInstrumentalist && (
+              <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
+                <p className="mb-3 text-sm font-medium text-zinc-300">
+                  Selecione seus instrumentos
+                </p>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {instruments.map((instrument) => (
+                    <label
+                      key={instrument}
+                      className="flex cursor-pointer items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-900 p-4"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedInstruments.includes(instrument)}
+                        onChange={() => toggleInstrument(instrument)}
+                        className="h-4 w-4"
+                      />
+
+                      <span className="font-medium">{instrument}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
             )}
 
-            <Button disabled={loading} className="md:col-span-2">
+            {isVocalist && birthDate && (
+              <div className="rounded-xl border border-violet-500/30 bg-violet-500/10 p-4 text-sm text-violet-200">
+                Grupo vocal calculado:{" "}
+                <strong>
+                  {getVocalGroup(birthDate) || "Fora da idade mínima"}
+                </strong>
+              </div>
+            )}
+
+            <Button disabled={loading} className="w-full">
               {loading ? "Salvando..." : "Salvar perfil"}
             </Button>
           </form>
