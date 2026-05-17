@@ -14,6 +14,10 @@ import { fetchMembers } from "@/lib/member-service";
 
 import { MemberProfile } from "@/types/members";
 
+import { PendingMembersCard } from "@/components/members/pending-members-card";
+
+import { MembersToolbar } from "@/components/members/members-toolbar";
+
 export default function MembrosPage() {
   const [members, setMembers] = useState<MemberProfile[]>([]);
   const [selectedMember, setSelectedMember] = useState<MemberProfile | null>(
@@ -21,6 +25,7 @@ export default function MembrosPage() {
   );
   const [canManageMembers, setCanManageMembers] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
 
   async function refreshMembers() {
     const updatedMembers = await fetchMembers();
@@ -68,6 +73,14 @@ export default function MembrosPage() {
     };
   }, []);
 
+  const filteredMembers = members.filter((member) =>
+    member.full_name.toLowerCase().includes(search.toLowerCase()),
+  );
+
+  const pendingMembers = members.filter(
+    (member) => member.status === "pending",
+  );
+
   return (
     <AppLayout>
       <div className="mb-8">
@@ -94,9 +107,16 @@ export default function MembrosPage() {
         </Card>
       )}
 
+      <PendingMembersCard
+        pendingMembers={pendingMembers}
+        onSelectMember={setSelectedMember}
+      />
+
+      <MembersToolbar search={search} onSearchChange={setSearch} />
+
       {!loading && members.length > 0 && (
         <MembersGrid
-          members={members}
+          members={filteredMembers}
           canManageMembers={canManageMembers}
           onSelectMember={setSelectedMember}
         />
