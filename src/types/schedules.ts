@@ -47,3 +47,35 @@ export type SystemSettings = {
   max_ministers_per_service: number;
   max_backvocals_per_service: number;
 };
+
+export type WeekProfile = {
+  full_name: string;
+} | null;
+
+export type MinistryWeek = {
+  id: string;
+  sunday_date: string;
+  wednesday_date: string;
+  rehearsal_date: string;
+  rehearsal_time: string;
+  sunday_time: string;
+  wednesday_time: string;
+  vocal_group: string;
+  status: string;
+  created_at: string;
+
+  week_instrument_assignments?: {
+    id: string;
+    instrument: string;
+    status: string;
+    profiles: WeekProfile;
+  }[];
+
+  week_vocal_assignments?: {
+    id: string;
+    role: string;
+    service_day: string;
+    status: string;
+    profiles: WeekProfile;
+  }[];
+};
