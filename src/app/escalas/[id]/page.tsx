@@ -16,6 +16,7 @@ import { InstrumentAssignmentsCard } from "@/components/weeks/instrument-assignm
 import { VocalAssignmentsCard } from "@/components/weeks/vocal-assignments-card";
 import { validateScaleBeforePublish } from "@/lib/schedule-validation";
 import { getSchedulePermissions } from "@/lib/schedule-permissions";
+import { fetchScheduleDetails } from "@/lib/schedule-service";
 
 import {
   InstrumentAssignment,
@@ -78,158 +79,22 @@ export default function EscalaDetailsPage() {
 
     setPermissions(currentPermissions);
 
-    const { data: weekData, error: weekError } = await supabase
-      .from("ministry_weeks")
-      .select(
-        `
-        id,
-        sunday_date,
-        wednesday_date,
-        rehearsal_date,
-        vocal_group,
-        status
-      `,
-      )
-      .eq("id", weekId)
-      .single();
+    try {
+      const data = await fetchScheduleDetails(weekId);
 
-    if (weekError) {
-      alert(weekError.message);
+      setWeek(data.week);
+      setSettings(data.settings);
+      setInstrumentalists(data.instrumentalists);
+      setVocalists(data.vocalists);
+      setInstrumentAssignments(data.instrumentAssignments);
+      setVocalAssignments(data.vocalAssignments);
       setLoading(false);
-      return;
-    }
-
-    const { data: settingsData, error: settingsError } = await supabase
-      .from("system_settings")
-      .select(
-        `
-        max_ministers_per_service,
-        max_backvocals_per_service
-      `,
-      )
-      .eq("id", 1)
-      .single();
-
-    if (settingsError) {
-      alert(settingsError.message);
+    } catch (error) {
+      alert(
+        error instanceof Error ? error.message : "Erro ao carregar escala.",
+      );
       setLoading(false);
-      return;
     }
-
-    const { data: instrumentalistsData, error: instrumentalistsError } =
-      await supabase
-        .from("member_functions")
-        .select(
-          `
-          id,
-          instrument,
-          vocal_group,
-          profiles!inner (
-            id,
-            full_name,
-            status
-          )
-        `,
-        )
-        .eq("function_type", "instrumentalist")
-        .eq("profiles.status", "approved")
-        .order("instrument", { ascending: true });
-
-    if (instrumentalistsError) {
-      alert(instrumentalistsError.message);
-      setLoading(false);
-      return;
-    }
-
-    const { data: vocalistsData, error: vocalistsError } = await supabase
-      .from("member_functions")
-      .select(
-        `
-        id,
-        instrument,
-        vocal_group,
-        profiles!inner (
-          id,
-          full_name,
-          status
-        )
-      `,
-      )
-      .eq("function_type", "vocalist")
-      .eq("vocal_group", weekData.vocal_group)
-      .eq("profiles.status", "approved")
-      .order("created_at", { ascending: true });
-
-    if (vocalistsError) {
-      alert(vocalistsError.message);
-      setLoading(false);
-      return;
-    }
-
-    const {
-      data: instrumentAssignmentsData,
-      error: instrumentAssignmentsError,
-    } = await supabase
-      .from("week_instrument_assignments")
-      .select(
-        `
-          id,
-          week_id,
-          member_id,
-          instrument,
-          status,
-          profiles (
-            full_name
-          )
-        `,
-      )
-      .eq("week_id", weekId)
-      .order("instrument", { ascending: true });
-
-    if (instrumentAssignmentsError) {
-      alert(instrumentAssignmentsError.message);
-      setLoading(false);
-      return;
-    }
-
-    const { data: vocalAssignmentsData, error: vocalAssignmentsError } =
-      await supabase
-        .from("week_vocal_assignments")
-        .select(
-          `
-          id,
-          member_id,
-          role,
-          service_day,
-          status,
-          profiles (
-            full_name
-          )
-        `,
-        )
-        .eq("week_id", weekId)
-        .order("service_day", { ascending: true });
-
-    if (vocalAssignmentsError) {
-      alert(vocalAssignmentsError.message);
-      setLoading(false);
-      return;
-    }
-
-    setWeek(weekData);
-    setSettings(settingsData);
-    setInstrumentalists(
-      (instrumentalistsData || []) as unknown as MemberFunction[],
-    );
-    setVocalists((vocalistsData || []) as unknown as MemberFunction[]);
-    setInstrumentAssignments(
-      (instrumentAssignmentsData || []) as unknown as InstrumentAssignment[],
-    );
-    setVocalAssignments(
-      (vocalAssignmentsData || []) as unknown as VocalAssignment[],
-    );
-
-    setLoading(false);
   }, [weekId]);
 
   useEffect(() => {
