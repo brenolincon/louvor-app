@@ -485,6 +485,80 @@ export default function EscalaDetailsPage() {
             instrumentsUserCanManage.includes(item.instrument),
         )
     : [];
+
+  function validateScaleBeforePublish() {
+    if (!settings) {
+      return "Configurações do sistema não carregadas.";
+    }
+
+    const requiredInstruments = [
+      "Bateria",
+      "Baixo",
+      "Teclado",
+      "Violão",
+      "Guitarra",
+    ];
+
+    for (const instrument of requiredInstruments) {
+      const exists = instrumentAssignments.some(
+        (assignment) => assignment.instrument === instrument,
+      );
+
+      if (!exists) {
+        return `Instrumento obrigatório não escalado: ${instrument}`;
+      }
+    }
+
+    const sundayMinister = vocalAssignments.some(
+      (assignment) =>
+        assignment.service_day === "sunday" && assignment.role === "minister",
+    );
+
+    if (!sundayMinister) {
+      return "Domingo precisa ter um ministro.";
+    }
+
+    const wednesdayMinister = vocalAssignments.some(
+      (assignment) =>
+        assignment.service_day === "wednesday" &&
+        assignment.role === "minister",
+    );
+
+    if (!wednesdayMinister) {
+      return "Quarta precisa ter um ministro.";
+    }
+
+    const sundayBacks = vocalAssignments.filter(
+      (assignment) =>
+        assignment.service_day === "sunday" && assignment.role === "backvocal",
+    ).length;
+
+    if (sundayBacks < settings.max_backvocals_per_service) {
+      return `Domingo precisa ter ${settings.max_backvocals_per_service} backs.`;
+    }
+
+    const wednesdayBacks = vocalAssignments.filter(
+      (assignment) =>
+        assignment.service_day === "wednesday" &&
+        assignment.role === "backvocal",
+    ).length;
+
+    if (wednesdayBacks < settings.max_backvocals_per_service) {
+      return `Quarta precisa ter ${settings.max_backvocals_per_service} backs.`;
+    }
+
+    const pendingAssignments = [
+      ...instrumentAssignments,
+      ...vocalAssignments,
+    ].some((assignment) => assignment.status === "pending");
+
+    if (pendingAssignments) {
+      return "Existem membros pendentes de confirmação.";
+    }
+
+    return null;
+  }
+
   async function updateWeekStatus(status: string) {
     if (!week) return;
 
@@ -501,6 +575,15 @@ export default function EscalaDetailsPage() {
     if (error) {
       alert(error.message);
       return;
+    }
+
+    if (status === "published") {
+      const validationError = validateScaleBeforePublish();
+
+      if (validationError) {
+        alert(validationError);
+        return;
+      }
     }
 
     await loadWeekData();
