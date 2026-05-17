@@ -144,3 +144,59 @@ export async function fetchScheduleDetails(weekId: string) {
       []) as unknown as VocalAssignment[],
   };
 }
+
+export async function updateScheduleStatus(weekId: string, status: string) {
+  const { error } = await supabase
+    .from("ministry_weeks")
+    .update({ status })
+    .eq("id", weekId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function createInstrumentAssignment({
+  weekId,
+  memberId,
+  instrument,
+}: {
+  weekId: string;
+  memberId: string;
+  instrument: string;
+}) {
+  const { error } = await supabase.from("week_instrument_assignments").insert({
+    week_id: weekId,
+    member_id: memberId,
+    instrument,
+    status: "pending",
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function createVocalAssignment({
+  weekId,
+  memberId,
+  role,
+  serviceDay,
+}: {
+  weekId: string;
+  memberId: string;
+  role: string;
+  serviceDay: string;
+}) {
+  const { error } = await supabase.from("week_vocal_assignments").insert({
+    week_id: weekId,
+    member_id: memberId,
+    role,
+    service_day: serviceDay,
+    status: "pending",
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}

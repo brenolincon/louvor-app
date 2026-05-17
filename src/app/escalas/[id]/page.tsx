@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 
-import { supabase } from "@/lib/supabase";
 import { getCurrentUserPermissions } from "@/lib/get-current-user-permissions";
 
 import { AppLayout } from "@/components/app-layout";
@@ -16,7 +15,12 @@ import { InstrumentAssignmentsCard } from "@/components/weeks/instrument-assignm
 import { VocalAssignmentsCard } from "@/components/weeks/vocal-assignments-card";
 import { validateScaleBeforePublish } from "@/lib/schedule-validation";
 import { getSchedulePermissions } from "@/lib/schedule-permissions";
-import { fetchScheduleDetails } from "@/lib/schedule-service";
+import {
+  createInstrumentAssignment,
+  createVocalAssignment,
+  fetchScheduleDetails,
+  updateScheduleStatus,
+} from "@/lib/schedule-service";
 
 import {
   InstrumentAssignment,
@@ -126,17 +130,14 @@ export default function EscalaDetailsPage() {
       }
     }
 
-    const { error } = await supabase
-      .from("ministry_weeks")
-      .update({ status })
-      .eq("id", week.id);
-
-    if (error) {
-      alert(error.message);
-      return;
+    try {
+      await updateScheduleStatus(week.id, status);
+      await loadWeekData();
+    } catch (error) {
+      alert(
+        error instanceof Error ? error.message : "Erro ao atualizar status.",
+      );
     }
-
-    await loadWeekData();
   }
 
   async function saveInstrumentAssignment(e: React.FormEvent) {
@@ -172,21 +173,23 @@ export default function EscalaDetailsPage() {
 
     setSavingInstrument(true);
 
-    const { error } = await supabase
-      .from("week_instrument_assignments")
-      .insert({
-        week_id: weekId,
-        member_id: selectedMemberId,
+    try {
+      await createInstrumentAssignment({
+        weekId,
+        memberId: selectedMemberId,
         instrument: selectedInstrument,
-        status: "pending",
       });
-
-    setSavingInstrument(false);
-
-    if (error) {
-      alert(error.message);
+    } catch (error) {
+      setSavingInstrument(false);
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Erro ao salvar instrumentista.",
+      );
       return;
     }
+
+    setSavingInstrument(false);
 
     setSelectedInstrument("");
     setSelectedMemberId("");
@@ -267,20 +270,20 @@ export default function EscalaDetailsPage() {
 
     setSavingVocal(true);
 
-    const { error } = await supabase.from("week_vocal_assignments").insert({
-      week_id: weekId,
-      member_id: selectedVocalistId,
-      role: selectedVocalRole,
-      service_day: selectedServiceDay,
-      status: "pending",
-    });
-
-    setSavingVocal(false);
-
-    if (error) {
-      alert(error.message);
+    try {
+      await createVocalAssignment({
+        weekId,
+        memberId: selectedVocalistId,
+        role: selectedVocalRole,
+        serviceDay: selectedServiceDay,
+      });
+    } catch (error) {
+      setSavingVocal(false);
+      alert(error instanceof Error ? error.message : "Erro ao salvar voz.");
       return;
     }
+
+    setSavingVocal(false);
 
     setSelectedServiceDay("");
     setSelectedVocalRole("");
