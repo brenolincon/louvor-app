@@ -15,6 +15,7 @@ import { ScheduleStatusCard } from "@/components/schedules/schedule-status-card"
 import { InstrumentAssignmentsCard } from "@/components/weeks/instrument-assignments-card";
 import { VocalAssignmentsCard } from "@/components/weeks/vocal-assignments-card";
 import { validateScaleBeforePublish } from "@/lib/schedule-validation";
+import { getSchedulePermissions } from "@/lib/schedule-permissions";
 
 import {
   InstrumentAssignment,
@@ -286,8 +287,6 @@ export default function EscalaDetailsPage() {
       return;
     }
 
-    const canManageAll = permissions?.isGeneralLeader === true;
-
     const canManageThisInstrument =
       canManageAll ||
       permissions?.instrumentsLed?.includes(selectedInstrument) === true;
@@ -447,29 +446,16 @@ export default function EscalaDetailsPage() {
 
   const canManageAll = permissions?.isGeneralLeader === true;
 
-  const canManageVocals =
-    canManageAll ||
-    permissions?.vocalGroupsLed?.includes(week.vocal_group) === true;
-
-  const userLedInstruments = permissions?.instrumentsLed || [];
-
-  const canManageInstruments = canManageAll || userLedInstruments.length > 0;
-
-  const instrumentsUserCanManage = canManageAll
-    ? instrumentalists
-        .map((item) => item.instrument)
-        .filter((instrument): instrument is string => Boolean(instrument))
-    : userLedInstruments;
-
-  const filteredInstrumentalists = canManageInstruments
-    ? canManageAll
-      ? instrumentalists
-      : instrumentalists.filter(
-          (item) =>
-            item.instrument !== null &&
-            instrumentsUserCanManage.includes(item.instrument),
-        )
-    : [];
+  const {
+    canManageVocals,
+    canManageInstruments,
+    instrumentsUserCanManage,
+    filteredInstrumentalists,
+  } = getSchedulePermissions({
+    permissions,
+    weekVocalGroup: week.vocal_group,
+    instrumentalists,
+  });
 
   const isPublishedOrClosed =
     week.status === "published" || week.status === "closed";
