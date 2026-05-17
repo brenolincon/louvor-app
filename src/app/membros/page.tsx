@@ -2,83 +2,29 @@
 
 import { useEffect, useState } from "react";
 import { Users } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+
 import { AppLayout } from "@/components/app-layout";
 import { Card } from "@/components/ui/card";
-import { MemberCard } from "@/components/members/member-card";
+
+import { MembersGrid } from "@/components/members/members-grid";
 import { MemberDetailsModal } from "@/components/members/member-details-modal";
+
 import { getCurrentUserPermissions } from "@/lib/get-current-user-permissions";
+import { fetchMembers } from "@/lib/member-service";
 
-type MemberFunction = {
-  id: string;
-  function_type: string;
-  vocal_group: string | null;
-  instrument: string | null;
-};
-
-type MemberLeadership = {
-  id: string;
-  leadership_type: string;
-  vocal_group: string | null;
-  instrument: string | null;
-};
-
-type Profile = {
-  id: string;
-  full_name: string;
-  phone: string | null;
-  birth_date: string | null;
-  status: string;
-  ministry_role: string;
-  created_at: string;
-  member_functions: MemberFunction[];
-  member_leaderships: MemberLeadership[];
-};
+import { MemberProfile } from "@/types/members";
 
 export default function MembrosPage() {
-  const [members, setMembers] = useState<Profile[]>([]);
-  const [selectedMember, setSelectedMember] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [members, setMembers] = useState<MemberProfile[]>([]);
+  const [selectedMember, setSelectedMember] = useState<MemberProfile | null>(
+    null,
+  );
   const [canManageMembers, setCanManageMembers] = useState(false);
-
-  async function fetchMembers() {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select(
-        `
-        id,
-        full_name,
-        phone,
-        birth_date,
-        status,
-        ministry_role,
-        created_at,
-        member_functions (
-          id,
-          function_type,
-          vocal_group,
-          instrument
-        ),
-        member_leaderships (
-          id,
-          leadership_type,
-          vocal_group,
-          instrument
-        )
-      `,
-      )
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      alert(error.message);
-      return [];
-    }
-
-    return data || [];
-  }
+  const [loading, setLoading] = useState(true);
 
   async function refreshMembers() {
     const updatedMembers = await fetchMembers();
+
     setMembers(updatedMembers);
 
     if (selectedMember) {
@@ -96,14 +42,23 @@ export default function MembrosPage() {
     async function loadMembers() {
       setLoading(true);
 
-      const permissions = await getCurrentUserPermissions();
-      setCanManageMembers(!!permissions?.isGeneralLeader);
-      const data = await fetchMembers();
+      try {
+        const permissions = await getCurrentUserPermissions();
+        const data = await fetchMembers();
 
-      if (!isMounted) return;
+        if (!isMounted) return;
 
-      setMembers(data);
-      setLoading(false);
+        setCanManageMembers(permissions?.isGeneralLeader === true);
+        setMembers(data);
+      } catch (error) {
+        alert(
+          error instanceof Error ? error.message : "Erro ao carregar membros.",
+        );
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
     }
 
     loadMembers();
@@ -121,8 +76,9 @@ export default function MembrosPage() {
         </div>
 
         <h1 className="text-3xl font-bold">Membros</h1>
+
         <p className="mt-2 text-zinc-400">
-          Gerencie integrantes, funções ministeriais e lideranças.
+          Visualize membros, funções ministeriais e lideranças.
         </p>
       </div>
 
@@ -139,19 +95,11 @@ export default function MembrosPage() {
       )}
 
       {!loading && members.length > 0 && (
-        <div className="grid gap-4">
-          {members.map((member) => (
-            <MemberCard
-              key={member.id}
-              member={member}
-              onClick={() => {
-                if (canManageMembers) {
-                  setSelectedMember(member);
-                }
-              }}
-            />
-          ))}
-        </div>
+        <MembersGrid
+          members={members}
+          canManageMembers={canManageMembers}
+          onSelectMember={setSelectedMember}
+        />
       )}
 
       {canManageMembers && (

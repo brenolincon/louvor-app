@@ -6,35 +6,10 @@ import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DatePicker } from "@/components/ui/date-picker";
-
-type MemberFunction = {
-  id: string;
-  function_type: string;
-  vocal_group: string | null;
-  instrument: string | null;
-};
-
-type MemberLeadership = {
-  id: string;
-  leadership_type: string;
-  vocal_group: string | null;
-  instrument: string | null;
-};
-
-type Profile = {
-  id: string;
-  full_name: string;
-  phone: string | null;
-  birth_date: string | null;
-  status: string;
-  ministry_role: string;
-  created_at: string;
-  member_functions: MemberFunction[];
-  member_leaderships: MemberLeadership[];
-};
+import { MemberProfile } from "@/types/members";
 
 type Props = {
-  member: Profile | null;
+  member: MemberProfile | null;
   open: boolean;
   onClose: () => void;
   onUpdated: () => void;
@@ -67,7 +42,7 @@ export function MemberDetailsModal({
   const [loadedMemberId, setLoadedMemberId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  function openMemberForEditing(memberData: Profile) {
+  function openMemberForEditing(memberData: MemberProfile) {
     setFullName(memberData.full_name);
     setPhone(memberData.phone || "");
     setBirthDate(memberData.birth_date || "");
