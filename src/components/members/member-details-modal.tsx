@@ -1,51 +1,44 @@
 "use client";
 
-import { useState } from "react";
-import { Crown, Save, X } from "lucide-react";
-import { supabase } from "@/lib/supabase";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { DatePicker } from "@/components/ui/date-picker";
+import { useMemo, useState } from "react";
+import { X } from "lucide-react";
+
+import {
+  approveMember,
+  promoteInstrumentLeader,
+  promoteVocalLeader,
+  rejectMember,
+  removeInstrumentLeader,
+  removeVocalLeader,
+  updateMemberProfile,
+} from "@/lib/member-actions";
+
 import { MemberProfile } from "@/types/members";
 
 type Props = {
-  member: MemberProfile | null;
   open: boolean;
+  member: MemberProfile | null;
   onClose: () => void;
-  onUpdated: () => void;
+  onUpdated: () => Promise<void>;
 };
-
-const vocalGroupLabels: Record<string, string> = {
-  unit: "Unit",
-  ative: "Ative",
-  teens: "Geração Teens",
-};
-
-function parseDate(date?: string) {
-  return date ? new Date(date + "T00:00:00") : undefined;
-}
-
-function formatDateInput(date?: Date) {
-  return date ? date.toISOString().split("T")[0] : "";
-}
 
 export function MemberDetailsModal({
-  member,
   open,
+  member,
   onClose,
   onUpdated,
 }: Props) {
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [birthDate, setBirthDate] = useState("");
-
   const [loadedMemberId, setLoadedMemberId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
 
-  function openMemberForEditing(memberData: MemberProfile) {
-    setFullName(memberData.full_name);
-    setPhone(memberData.phone || "");
-    setBirthDate(memberData.birth_date || "");
+  const [saving, setSaving] = useState(false);
+
+  function loadMemberData(currentMember: MemberProfile) {
+    setFullName(currentMember.full_name || "");
+    setPhone(currentMember.phone || "");
+    setBirthDate(currentMember.birth_date || "");
   }
 
   function handleClose() {
@@ -53,443 +46,354 @@ export function MemberDetailsModal({
     onClose();
   }
 
-  async function updateMemberInfo() {
-    if (!member) return;
+  const currentMember = member!;
 
-    setLoading(true);
+  const vocalFunction = useMemo(() => {
+    return currentMember?.member_functions.find(
+      (func) => func.function_type === "vocalist",
+    );
+  }, [currentMember]);
 
-    const { error } = await supabase
-      .from("profiles")
-      .update({
-        full_name: fullName,
-        phone,
-        birth_date: birthDate,
-      })
-      .eq("id", member.id);
+  const instrumentalFunctions = useMemo(() => {
+    return (
+      currentMember?.member_functions.filter(
+        (func) => func.function_type === "instrumentalist",
+      ) || []
+    );
+  }, [currentMember]);
 
-    setLoading(false);
+  const vocalLeadership = useMemo(() => {
+    return currentMember?.member_leaderships.find(
+      (leadership) => leadership.leadership_type === "vocal_leader",
+    );
+  }, [currentMember]);
 
-    if (error) {
-      alert(error.message);
-      return;
-    }
+  const instrumentLeaderships = useMemo(() => {
+    return (
+      currentMember?.member_leaderships.filter(
+        (leadership) => leadership.leadership_type === "instrument_leader",
+      ) || []
+    );
+  }, [currentMember]);
 
-    onUpdated();
+  if (!open || !currentMember) {
+    return null;
   }
-
-  async function updateStatus(status: string) {
-    if (!member) return;
-
-    setLoading(true);
-
-    const { error } = await supabase
-      .from("profiles")
-      .update({ status })
-      .eq("id", member.id);
-
-    setLoading(false);
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    onUpdated();
-  }
-
-  async function addLeadership(
-    leadershipTypeValue: string,
-    vocalGroupValue: string | null,
-    instrumentValue: string | null,
-  ) {
-    if (!member) return;
-
-    setLoading(true);
-
-    const { data, error } = await supabase
-      .from("member_leaderships")
-      .insert({
-        member_id: member.id,
-        leadership_type: leadershipTypeValue,
-        vocal_group: vocalGroupValue,
-        instrument: instrumentValue,
-      })
-      .select();
-
-    setLoading(false);
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    console.log("Liderança criada:", data);
-
-    await onUpdated();
-  }
-
-  async function removeLeadership(leadershipId: string) {
-    setLoading(true);
-
-    const { error } = await supabase
-      .from("member_leaderships")
-      .delete()
-      .eq("id", leadershipId);
-
-    setLoading(false);
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    onUpdated();
-  }
-
-  if (!open || !member) return null;
-
-  const currentMember = member;
 
   if (loadedMemberId !== currentMember.id) {
-    openMemberForEditing(currentMember);
+    loadMemberData(currentMember);
     setLoadedMemberId(currentMember.id);
   }
+  async function handleSaveProfile() {
+    try {
+      setSaving(true);
 
-  const memberVocalGroups = [
-    ...new Set(
-      member.member_functions
-        .filter((func) => func.function_type === "vocalist" && func.vocal_group)
-        .map((func) => func.vocal_group as string),
-    ),
-  ];
+      await updateMemberProfile({
+        memberId: currentMember.id,
+        fullName,
+        phone: phone || null,
+        birthDate: birthDate || null,
+      });
 
-  const isGeneralLeader = hasLeadership("general_leader", null, null);
+      await onUpdated();
 
-  const memberInstruments = member.member_functions
-    .filter(
-      (func) => func.function_type === "instrumentalist" && func.instrument,
-    )
-    .map((func) => func.instrument as string);
-
-  const uniqueMemberInstruments = [...new Set(memberInstruments)];
-
-  function hasLeadership(
-    leadershipTypeValue: string,
-    vocalGroupValue: string | null,
-    instrumentValue: string | null,
-  ) {
-    return currentMember.member_leaderships.some((leadership) => {
-      return (
-        leadership.leadership_type === leadershipTypeValue &&
-        leadership.vocal_group === vocalGroupValue &&
-        leadership.instrument === instrumentValue
+      alert("Perfil atualizado.");
+    } catch (error) {
+      alert(
+        error instanceof Error ? error.message : "Erro ao atualizar perfil.",
       );
-    });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleApprove() {
+    try {
+      setSaving(true);
+
+      await approveMember(currentMember.id);
+
+      await onUpdated();
+
+      alert("Membro aprovado.");
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Erro ao aprovar membro.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleReject() {
+    try {
+      setSaving(true);
+
+      await rejectMember(currentMember.id);
+
+      await onUpdated();
+
+      alert("Membro recusado.");
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Erro ao recusar membro.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleToggleVocalLeadership() {
+    if (!vocalFunction?.vocal_group) {
+      alert("Membro não possui grupo vocal.");
+      return;
+    }
+
+    try {
+      setSaving(true);
+
+      if (vocalLeadership) {
+        await removeVocalLeader(currentMember.id);
+      } else {
+        await promoteVocalLeader({
+          memberId: currentMember.id,
+          vocalGroup: vocalFunction.vocal_group,
+        });
+      }
+
+      await onUpdated();
+
+      alert(
+        vocalLeadership
+          ? "Liderança vocal removida."
+          : "Promovido para liderança vocal.",
+      );
+    } catch (error) {
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Erro ao atualizar liderança vocal.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleToggleInstrumentLeadership(instrument: string) {
+    if (!instrument) {
+      alert("Instrumento inválido.");
+      return;
+    }
+
+    const alreadyLeader = instrumentLeaderships.some(
+      (leadership) => leadership.instrument === instrument,
+    );
+
+    try {
+      setSaving(true);
+
+      if (alreadyLeader) {
+        await removeInstrumentLeader({
+          memberId: currentMember.id,
+          instrument,
+        });
+      } else {
+        await promoteInstrumentLeader({
+          memberId: currentMember.id,
+          instrument,
+        });
+      }
+
+      await onUpdated();
+
+      alert(
+        alreadyLeader ? "Liderança removida." : "Promovido para liderança.",
+      );
+    } catch (error) {
+      alert(
+        error instanceof Error ? error.message : "Erro ao atualizar liderança.",
+      );
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
-    <div className="fixed inset-0 z-100 flex justify-end bg-black/70 backdrop-blur-sm">
-      <div className="h-full w-full overflow-y-auto border-l border-zinc-800 bg-zinc-950 p-6 shadow-2xl lg:max-w-3xl">
-        <div className="mb-8 flex items-start justify-between gap-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+      <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-3xl border border-zinc-800 bg-zinc-950">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-zinc-800 bg-zinc-950 px-6 py-5">
           <div>
-            <h2 className="text-2xl font-bold">Detalhes do membro</h2>
-            <p className="mt-1 text-sm text-zinc-400">
-              Visualize, edite e gerencie lideranças.
+            <h2 className="text-2xl font-bold text-white">
+              {currentMember.full_name}
+            </h2>
+
+            <p className="text-sm text-zinc-400">
+              Gerenciamento completo do membro
             </p>
           </div>
 
           <button
             onClick={handleClose}
-            className="rounded-xl p-2 text-zinc-400 hover:bg-zinc-900 hover:text-white"
+            className="rounded-xl border border-zinc-700 p-2 text-zinc-400 transition hover:border-zinc-500 hover:text-white"
             type="button"
           >
-            <X size={22} />
+            <X size={20} />
           </button>
         </div>
 
-        <div className="space-y-5">
-          <section className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-5">
-            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <h3 className="text-lg font-semibold">Informações pessoais</h3>
-
-              <Button onClick={updateMemberInfo} disabled={loading}>
-                <span className="flex items-center gap-2">
-                  <Save size={16} />
-                  Salvar
-                </span>
-              </Button>
-            </div>
+        <div className="space-y-6 p-6">
+          <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5">
+            <h3 className="mb-4 text-lg font-semibold text-white">
+              Informações pessoais
+            </h3>
 
             <div className="grid gap-4 md:grid-cols-2">
-              <Input
-                placeholder="Nome completo"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-              />
+              <div>
+                <label className="mb-2 block text-sm text-zinc-400">
+                  Nome completo
+                </label>
 
-              <Input
-                placeholder="Telefone"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-              />
-
-              <DatePicker
-                value={parseDate(birthDate)}
-                placeholder="Data de nascimento"
-                onChange={(date) => setBirthDate(formatDateInput(date))}
-              />
-            </div>
-          </section>
-
-          <section className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-5">
-            <h3 className="mb-4 text-lg font-semibold">Funções ministeriais</h3>
-
-            <div className="space-y-3">
-              {member.member_functions.length === 0 && (
-                <p className="text-sm text-zinc-500">
-                  Nenhuma função ministerial cadastrada.
-                </p>
-              )}
-
-              {member.member_functions.map((func) => (
-                <div
-                  key={func.id}
-                  className="rounded-xl border border-zinc-800 bg-zinc-950 p-4"
-                >
-                  {func.function_type === "vocalist" && (
-                    <>
-                      <p className="font-medium">Vocal</p>
-                      <p className="text-sm text-zinc-400">
-                        Grupo:{" "}
-                        {func.vocal_group
-                          ? vocalGroupLabels[func.vocal_group]
-                          : "-"}
-                      </p>
-                    </>
-                  )}
-
-                  {func.function_type === "instrumentalist" && (
-                    <>
-                      <p className="font-medium">Instrumentista</p>
-                      <p className="text-sm text-zinc-400">
-                        Instrumento: {func.instrument || "-"}
-                      </p>
-                    </>
-                  )}
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-5">
-            <div className="mb-4 flex items-center gap-2">
-              <Crown className="text-violet-400" size={20} />
-              <h3 className="text-lg font-semibold">Lideranças</h3>
-            </div>
-
-            <div className="space-y-4">
-              <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="font-medium">Líder geral</p>
-                    <p className="text-sm text-zinc-500">
-                      Pode gerenciar todo o sistema.
-                    </p>
-                  </div>
-
-                  {hasLeadership("general_leader", null, null) ? (
-                    <Button
-                      variant="danger"
-                      onClick={() => {
-                        const leadership = member.member_leaderships.find(
-                          (item) => item.leadership_type === "general_leader",
-                        );
-
-                        if (leadership) {
-                          removeLeadership(leadership.id);
-                        }
-                      }}
-                      disabled={loading}
-                    >
-                      Remover liderança
-                    </Button>
-                  ) : (
-                    <Button
-                      onClick={() =>
-                        addLeadership("general_leader", null, null)
-                      }
-                      disabled={loading}
-                    >
-                      Promover
-                    </Button>
-                  )}
-                </div>
+                <input
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  className="h-12 w-full rounded-2xl border border-zinc-800 bg-zinc-950 px-4 text-white outline-none transition focus:border-violet-500"
+                />
               </div>
 
-              {!isGeneralLeader &&
-                memberVocalGroups.map((group) => (
-                  <div
-                    key={group}
-                    className="rounded-xl border border-zinc-800 bg-zinc-950 p-4"
-                  >
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <p className="font-medium">
-                          Líder {vocalGroupLabels[group] || group}
-                        </p>
-                        <p className="text-sm text-zinc-500">
-                          Pode liderar o grupo vocal que pertence.
-                        </p>
-                      </div>
+              <div>
+                <label className="mb-2 block text-sm text-zinc-400">
+                  Telefone
+                </label>
 
-                      {hasLeadership("vocal_leader", group, null) ? (
-                        <Button
-                          variant="danger"
-                          onClick={() => {
-                            const leadership = member.member_leaderships.find(
-                              (item) =>
-                                item.leadership_type === "vocal_leader" &&
-                                item.vocal_group === group,
-                            );
+                <input
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="h-12 w-full rounded-2xl border border-zinc-800 bg-zinc-950 px-4 text-white outline-none transition focus:border-violet-500"
+                />
+              </div>
 
-                            if (leadership) {
-                              removeLeadership(leadership.id);
-                            }
-                          }}
-                          disabled={loading}
-                        >
-                          Remover liderança
-                        </Button>
-                      ) : (
-                        <Button
-                          onClick={() =>
-                            addLeadership("vocal_leader", group, null)
-                          }
-                          disabled={loading}
-                        >
-                          Promover
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                ))}
+              <div>
+                <label className="mb-2 block text-sm text-zinc-400">
+                  Data nascimento
+                </label>
 
-              {!isGeneralLeader &&
-                uniqueMemberInstruments.map((instrument) => (
-                  <div
-                    key={instrument}
-                    className="rounded-xl border border-zinc-800 bg-zinc-950 p-4"
-                  >
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <p className="font-medium">Líder de {instrument}</p>
-                        <p className="text-sm text-zinc-500">
-                          Pode liderar apenas este instrumento.
-                        </p>
-                      </div>
+                <input
+                  type="date"
+                  value={birthDate}
+                  onChange={(e) => setBirthDate(e.target.value)}
+                  className="h-12 w-full rounded-2xl border border-zinc-800 bg-zinc-950 px-4 text-white outline-none transition focus:border-violet-500"
+                />
+              </div>
+            </div>
 
-                      {hasLeadership("instrument_leader", null, instrument) ? (
-                        <Button
-                          variant="danger"
-                          onClick={() => {
-                            const leadership = member.member_leaderships.find(
-                              (item) =>
-                                item.leadership_type === "instrument_leader" &&
-                                item.instrument === instrument,
-                            );
+            <button
+              disabled={saving}
+              onClick={handleSaveProfile}
+              className="mt-5 rounded-2xl bg-violet-600 px-5 py-3 text-sm font-medium text-white transition hover:bg-violet-500 disabled:opacity-50"
+              type="button"
+            >
+              {saving ? "Salvando..." : "Salvar alterações"}
+            </button>
+          </div>
 
-                            if (leadership) {
-                              removeLeadership(leadership.id);
-                            }
-                          }}
-                          disabled={loading}
-                        >
-                          Remover liderança
-                        </Button>
-                      ) : (
-                        <Button
-                          onClick={() =>
-                            addLeadership("instrument_leader", null, instrument)
-                          }
-                          disabled={loading}
-                        >
-                          Promover
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                ))}
+          {currentMember.status === "pending" && (
+            <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/5 p-5">
+              <h3 className="mb-4 text-lg font-semibold text-white">
+                Aprovação
+              </h3>
 
-              {isGeneralLeader && (
-                <p className="text-sm text-zinc-500">
-                  Este membro já é líder geral, então não precisa receber
-                  liderança vocal ou instrumental.
-                </p>
-              )}
+              <div className="flex flex-wrap gap-3">
+                <button
+                  disabled={saving}
+                  onClick={handleApprove}
+                  className="rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:opacity-50"
+                  type="button"
+                >
+                  Aprovar membro
+                </button>
 
-              {memberVocalGroups.length === 0 &&
-                uniqueMemberInstruments.length === 0 && (
-                  <p className="text-sm text-zinc-500">
-                    Este membro não possui funções que permitam promoção para
-                    liderança vocal ou instrumental.
+                <button
+                  disabled={saving}
+                  onClick={handleReject}
+                  className="rounded-2xl bg-red-600 px-5 py-3 text-sm font-medium text-white transition hover:bg-red-500 disabled:opacity-50"
+                  type="button"
+                >
+                  Recusar membro
+                </button>
+              </div>
+            </div>
+          )}
+
+          {vocalFunction && (
+            <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-white">
+                    Liderança vocal
+                  </h3>
+
+                  <p className="mt-1 text-sm text-zinc-400">
+                    Grupo: {vocalFunction.vocal_group}
                   </p>
-                )}
+                </div>
+
+                <button
+                  disabled={saving}
+                  onClick={handleToggleVocalLeadership}
+                  className={`rounded-2xl px-5 py-3 text-sm font-medium text-white transition disabled:opacity-50 ${
+                    vocalLeadership
+                      ? "bg-red-600 hover:bg-red-500"
+                      : "bg-violet-600 hover:bg-violet-500"
+                  }`}
+                  type="button"
+                >
+                  {vocalLeadership ? "Remover liderança" : "Promover liderança"}
+                </button>
+              </div>
             </div>
-          </section>
+          )}
 
-          <section className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-5">
-            <h3 className="mb-4 text-lg font-semibold">Ações</h3>
+          {instrumentalFunctions.length > 0 && (
+            <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5">
+              <h3 className="mb-4 text-lg font-semibold text-white">
+                Liderança instrumentos
+              </h3>
 
-            <div className="flex flex-wrap gap-2">
-              {member.status !== "approved" && (
-                <Button
-                  onClick={() => updateStatus("approved")}
-                  disabled={loading}
-                >
-                  Aprovar
-                </Button>
-              )}
+              <div className="space-y-3">
+                {instrumentalFunctions.map((func) => {
+                  const isLeader = instrumentLeaderships.some(
+                    (leadership) => leadership.instrument === func.instrument,
+                  );
 
-              {member.status !== "training" && (
-                <Button
-                  variant="secondary"
-                  onClick={() => updateStatus("training")}
-                  disabled={loading}
-                >
-                  Treinamento
-                </Button>
-              )}
+                  return (
+                    <div
+                      key={func.id}
+                      className="flex flex-col gap-3 rounded-2xl border border-zinc-800 bg-zinc-950 p-4 lg:flex-row lg:items-center lg:justify-between"
+                    >
+                      <div>
+                        <p className="font-medium text-white">
+                          {func.instrument}
+                        </p>
+                      </div>
 
-              {member.status !== "rejected" && (
-                <Button
-                  variant="danger"
-                  onClick={() => updateStatus("rejected")}
-                  disabled={loading}
-                >
-                  Recusar
-                </Button>
-              )}
-
-              {member.status !== "inactive" && (
-                <Button
-                  variant="danger"
-                  onClick={() => updateStatus("inactive")}
-                  disabled={loading}
-                >
-                  Inativar
-                </Button>
-              )}
-
-              {member.status === "inactive" && (
-                <Button
-                  onClick={() => updateStatus("approved")}
-                  disabled={loading}
-                >
-                  Reativar
-                </Button>
-              )}
+                      <button
+                        disabled={saving}
+                        onClick={() =>
+                          handleToggleInstrumentLeadership(
+                            func.instrument || "",
+                          )
+                        }
+                        className={`rounded-2xl px-5 py-3 text-sm font-medium text-white transition disabled:opacity-50 ${
+                          isLeader
+                            ? "bg-red-600 hover:bg-red-500"
+                            : "bg-cyan-600 hover:bg-cyan-500"
+                        }`}
+                        type="button"
+                      >
+                        {isLeader ? "Remover liderança" : "Promover liderança"}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          </section>
+          )}
         </div>
       </div>
     </div>
