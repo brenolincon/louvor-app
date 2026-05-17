@@ -18,6 +18,7 @@ type Week = {
   wednesday_date: string;
   rehearsal_date: string;
   vocal_group: string;
+  status: string;
 };
 
 type MemberFunction = {
@@ -64,6 +65,15 @@ const vocalGroupLabels: Record<string, string> = {
   unit: "Unit",
   ative: "Ative",
   teens: "Geração Teens",
+};
+
+const weekStatusLabels: Record<string, string> = {
+  draft: "Rascunho",
+  building: "Montando escala",
+  waiting_repertoire: "Aguardando repertório",
+  waiting_confirmations: "Aguardando confirmações",
+  published: "Publicada",
+  closed: "Encerrada",
 };
 
 function formatDate(date: string) {
@@ -125,7 +135,8 @@ export default function EscalaDetailsPage() {
         sunday_date,
         wednesday_date,
         rehearsal_date,
-        vocal_group
+        vocal_group,
+        status
       `,
       )
       .eq("id", weekId)
@@ -280,6 +291,11 @@ export default function EscalaDetailsPage() {
   async function saveInstrumentAssignment(e: React.FormEvent) {
     e.preventDefault();
 
+    if (week?.status === "published" || week?.status === "closed") {
+      alert("Esta escala já foi publicada ou encerrada.");
+      return;
+    }
+
     if (!selectedInstrument || !selectedMemberId) {
       alert("Selecione instrumento e músico.");
       return;
@@ -331,6 +347,11 @@ export default function EscalaDetailsPage() {
 
   async function saveVocalAssignment(e: React.FormEvent) {
     e.preventDefault();
+
+    if (week?.status === "published" || week?.status === "closed") {
+      alert("Esta escala já foi publicada ou encerrada.");
+      return;
+    }
 
     const canManageVocals =
       permissions?.isGeneralLeader === true ||
@@ -464,6 +485,30 @@ export default function EscalaDetailsPage() {
             instrumentsUserCanManage.includes(item.instrument),
         )
     : [];
+  async function updateWeekStatus(status: string) {
+    if (!week) return;
+
+    if (permissions?.isGeneralLeader !== true) {
+      alert("Apenas o líder geral pode alterar o status da escala.");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("ministry_weeks")
+      .update({ status })
+      .eq("id", week.id);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    await loadWeekData();
+  }
+  const isPublishedOrClosed =
+    week.status === "published" || week.status === "closed";
+
+  const canEditScale = !isPublishedOrClosed;
 
   return (
     <AppLayout>
@@ -486,6 +531,74 @@ export default function EscalaDetailsPage() {
         </p>
       </div>
 
+      <Card className="mb-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-sm text-zinc-500">Status da escala</p>
+
+            <h2 className="mt-1 text-xl font-semibold">
+              {weekStatusLabels[week.status] || week.status}
+            </h2>
+
+            {isPublishedOrClosed && (
+              <p className="mt-2 text-sm text-zinc-400">
+                Esta escala está publicada ou encerrada. As edições estão
+                bloqueadas.
+              </p>
+            )}
+          </div>
+
+          {permissions?.isGeneralLeader && (
+            <div className="flex flex-wrap gap-2">
+              {week.status === "draft" && (
+                <button
+                  onClick={() => updateWeekStatus("building")}
+                  className="rounded-xl bg-violet-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-violet-500"
+                >
+                  Iniciar montagem
+                </button>
+              )}
+
+              {week.status === "building" && (
+                <button
+                  onClick={() => updateWeekStatus("waiting_repertoire")}
+                  className="rounded-xl bg-violet-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-violet-500"
+                >
+                  Aguardar repertório
+                </button>
+              )}
+
+              {week.status === "waiting_repertoire" && (
+                <button
+                  onClick={() => updateWeekStatus("waiting_confirmations")}
+                  className="rounded-xl bg-violet-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-violet-500"
+                >
+                  Aguardar confirmações
+                </button>
+              )}
+
+              {week.status === "waiting_confirmations" && (
+                <button
+                  onClick={() => updateWeekStatus("published")}
+                  className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-emerald-500"
+                >
+                  Publicar escala
+                </button>
+              )}
+
+              {week.status === "published" && (
+                <button
+                  onClick={() => updateWeekStatus("closed")}
+                  className="rounded-xl bg-zinc-800 px-4 py-3 text-sm font-medium text-white transition hover:bg-zinc-700"
+                >
+                  Encerrar escala
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </Card>
+
       <div className="grid gap-5 xl:grid-cols-2">
         <InstrumentAssignmentsCard
           instrumentalists={filteredInstrumentalists}
@@ -493,7 +606,7 @@ export default function EscalaDetailsPage() {
           selectedInstrument={selectedInstrument}
           selectedMemberId={selectedMemberId}
           saving={savingInstrument}
-          canManage={canManageInstruments}
+          canManage={canManageInstruments && canEditScale}
           allowedInstruments={instrumentsUserCanManage}
           onInstrumentChange={setSelectedInstrument}
           onMemberChange={setSelectedMemberId}
@@ -507,7 +620,7 @@ export default function EscalaDetailsPage() {
           selectedVocalRole={selectedVocalRole}
           selectedVocalistId={selectedVocalistId}
           saving={savingVocal}
-          canManage={canManageVocals}
+          canManage={canManageVocals && canEditScale}
           onServiceDayChange={setSelectedServiceDay}
           onVocalRoleChange={setSelectedVocalRole}
           onVocalistChange={setSelectedVocalistId}
