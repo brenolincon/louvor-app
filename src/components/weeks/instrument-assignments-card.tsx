@@ -41,6 +41,22 @@ type Props = {
   onSubmit: (e: React.FormEvent) => void;
 };
 
+const statusLabels: Record<string, string> = {
+  pending: "Pendente",
+  confirmed: "Confirmado",
+  declined: "Recusado",
+  justified: "Justificado",
+  substituted: "Substituído",
+};
+
+const statusClasses: Record<string, string> = {
+  pending: "border-yellow-500/30 bg-yellow-500/10 text-yellow-300",
+  confirmed: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300",
+  declined: "border-red-500/30 bg-red-500/10 text-red-300",
+  justified: "border-blue-500/30 bg-blue-500/10 text-blue-300",
+  substituted: "border-zinc-500/30 bg-zinc-500/10 text-zinc-300",
+};
+
 export function InstrumentAssignmentsCard({
   instrumentalists,
   assignments,
@@ -153,8 +169,13 @@ export function InstrumentAssignmentsCard({
               </p>
             </div>
 
-            <span className="rounded-full border border-zinc-700 px-3 py-1 text-xs text-zinc-400">
-              {assignment.status}
+            <span
+              className={`rounded-full border px-3 py-1 text-xs font-medium ${
+                statusClasses[assignment.status] ||
+                "border-zinc-700 text-zinc-400"
+              }`}
+            >
+              {statusLabels[assignment.status] || assignment.status}
             </span>
           </div>
         ))}
