@@ -2,83 +2,28 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { CalendarDays } from "lucide-react";
 
 import { supabase } from "@/lib/supabase";
 import { getCurrentUserPermissions } from "@/lib/get-current-user-permissions";
 
 import { AppLayout } from "@/components/app-layout";
 import { Card } from "@/components/ui/card";
+
+import { ScheduleHeader } from "@/components/schedules/schedule-header";
+import { ScheduleStatusCard } from "@/components/schedules/schedule-status-card";
+
 import { InstrumentAssignmentsCard } from "@/components/weeks/instrument-assignments-card";
 import { VocalAssignmentsCard } from "@/components/weeks/vocal-assignments-card";
 
-type Week = {
-  id: string;
-  sunday_date: string;
-  wednesday_date: string;
-  rehearsal_date: string;
-  vocal_group: string;
-  status: string;
-};
-
-type MemberFunction = {
-  id: string;
-  instrument: string | null;
-  vocal_group: string | null;
-  profiles: {
-    id: string;
-    full_name: string;
-    status: string;
-  } | null;
-};
-
-type InstrumentAssignment = {
-  id: string;
-  week_id: string;
-  member_id: string;
-  instrument: string;
-  status: string;
-  profiles: {
-    full_name: string;
-  } | null;
-};
-
-type VocalAssignment = {
-  id: string;
-  member_id: string;
-  role: string;
-  service_day: string;
-  status: string;
-  profiles: {
-    full_name: string;
-  } | null;
-};
-
-type SystemSettings = {
-  max_ministers_per_service: number;
-  max_backvocals_per_service: number;
-};
+import {
+  InstrumentAssignment,
+  MemberFunction,
+  SystemSettings,
+  VocalAssignment,
+  Week,
+} from "@/types/schedules";
 
 type Permissions = Awaited<ReturnType<typeof getCurrentUserPermissions>>;
-
-const vocalGroupLabels: Record<string, string> = {
-  unit: "Unit",
-  ative: "Ative",
-  teens: "Geração Teens",
-};
-
-const weekStatusLabels: Record<string, string> = {
-  draft: "Rascunho",
-  building: "Montando escala",
-  waiting_repertoire: "Aguardando repertório",
-  waiting_confirmations: "Aguardando confirmações",
-  published: "Publicada",
-  closed: "Encerrada",
-};
-
-function formatDate(date: string) {
-  return new Date(date + "T00:00:00").toLocaleDateString("pt-BR");
-}
 
 export default function EscalaDetailsPage() {
   const params = useParams();
@@ -91,16 +36,20 @@ export default function EscalaDetailsPage() {
   const [instrumentalists, setInstrumentalists] = useState<MemberFunction[]>(
     [],
   );
+
   const [vocalists, setVocalists] = useState<MemberFunction[]>([]);
+
   const [instrumentAssignments, setInstrumentAssignments] = useState<
     InstrumentAssignment[]
   >([]);
+
   const [vocalAssignments, setVocalAssignments] = useState<VocalAssignment[]>(
     [],
   );
 
   const [selectedInstrument, setSelectedInstrument] = useState("");
   const [selectedMemberId, setSelectedMemberId] = useState("");
+
   const [selectedServiceDay, setSelectedServiceDay] = useState("");
   const [selectedVocalRole, setSelectedVocalRole] = useState("");
   const [selectedVocalistId, setSelectedVocalistId] = useState("");
@@ -277,6 +226,7 @@ export default function EscalaDetailsPage() {
     setVocalAssignments(
       (vocalAssignmentsData || []) as unknown as VocalAssignment[],
     );
+
     setLoading(false);
   }, [weekId]);
 
@@ -287,6 +237,109 @@ export default function EscalaDetailsPage() {
 
     init();
   }, [loadWeekData]);
+
+  function validateScaleBeforePublish() {
+    if (!settings) {
+      return "Configurações do sistema não carregadas.";
+    }
+
+    const requiredInstruments = [
+      "Bateria",
+      "Baixo",
+      "Teclado",
+      "Violão",
+      "Guitarra",
+    ];
+
+    for (const instrument of requiredInstruments) {
+      const exists = instrumentAssignments.some(
+        (assignment) => assignment.instrument === instrument,
+      );
+
+      if (!exists) {
+        return `Instrumento obrigatório não escalado: ${instrument}`;
+      }
+    }
+
+    const sundayMinisterCount = vocalAssignments.filter(
+      (assignment) =>
+        assignment.service_day === "sunday" && assignment.role === "minister",
+    ).length;
+
+    if (sundayMinisterCount < settings.max_ministers_per_service) {
+      return `Domingo precisa ter ${settings.max_ministers_per_service} ministro(s).`;
+    }
+
+    const wednesdayMinisterCount = vocalAssignments.filter(
+      (assignment) =>
+        assignment.service_day === "wednesday" &&
+        assignment.role === "minister",
+    ).length;
+
+    if (wednesdayMinisterCount < settings.max_ministers_per_service) {
+      return `Quarta precisa ter ${settings.max_ministers_per_service} ministro(s).`;
+    }
+
+    const sundayBacks = vocalAssignments.filter(
+      (assignment) =>
+        assignment.service_day === "sunday" && assignment.role === "backvocal",
+    ).length;
+
+    if (sundayBacks < settings.max_backvocals_per_service) {
+      return `Domingo precisa ter ${settings.max_backvocals_per_service} backs.`;
+    }
+
+    const wednesdayBacks = vocalAssignments.filter(
+      (assignment) =>
+        assignment.service_day === "wednesday" &&
+        assignment.role === "backvocal",
+    ).length;
+
+    if (wednesdayBacks < settings.max_backvocals_per_service) {
+      return `Quarta precisa ter ${settings.max_backvocals_per_service} backs.`;
+    }
+
+    const pendingAssignments = [
+      ...instrumentAssignments,
+      ...vocalAssignments,
+    ].some((assignment) => assignment.status === "pending");
+
+    if (pendingAssignments) {
+      return "Existem membros pendentes de confirmação.";
+    }
+
+    return null;
+  }
+
+  async function updateWeekStatus(status: string) {
+    if (!week) return;
+
+    if (permissions?.isGeneralLeader !== true) {
+      alert("Apenas o líder geral pode alterar o status da escala.");
+      return;
+    }
+
+    if (status === "published") {
+      const validationError = validateScaleBeforePublish();
+
+      if (validationError) {
+        alert(validationError);
+        return;
+      }
+    }
+
+    const { error } = await supabase
+      .from("ministry_weeks")
+      .update({ status })
+      .eq("id", week.id);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    await loadWeekData();
+  }
 
   async function saveInstrumentAssignment(e: React.FormEvent) {
     e.preventDefault();
@@ -486,108 +539,6 @@ export default function EscalaDetailsPage() {
         )
     : [];
 
-  function validateScaleBeforePublish() {
-    if (!settings) {
-      return "Configurações do sistema não carregadas.";
-    }
-
-    const requiredInstruments = [
-      "Bateria",
-      "Baixo",
-      "Teclado",
-      "Violão",
-      "Guitarra",
-    ];
-
-    for (const instrument of requiredInstruments) {
-      const exists = instrumentAssignments.some(
-        (assignment) => assignment.instrument === instrument,
-      );
-
-      if (!exists) {
-        return `Instrumento obrigatório não escalado: ${instrument}`;
-      }
-    }
-
-    const sundayMinister = vocalAssignments.some(
-      (assignment) =>
-        assignment.service_day === "sunday" && assignment.role === "minister",
-    );
-
-    if (!sundayMinister) {
-      return "Domingo precisa ter um ministro.";
-    }
-
-    const wednesdayMinister = vocalAssignments.some(
-      (assignment) =>
-        assignment.service_day === "wednesday" &&
-        assignment.role === "minister",
-    );
-
-    if (!wednesdayMinister) {
-      return "Quarta precisa ter um ministro.";
-    }
-
-    const sundayBacks = vocalAssignments.filter(
-      (assignment) =>
-        assignment.service_day === "sunday" && assignment.role === "backvocal",
-    ).length;
-
-    if (sundayBacks < settings.max_backvocals_per_service) {
-      return `Domingo precisa ter ${settings.max_backvocals_per_service} backs.`;
-    }
-
-    const wednesdayBacks = vocalAssignments.filter(
-      (assignment) =>
-        assignment.service_day === "wednesday" &&
-        assignment.role === "backvocal",
-    ).length;
-
-    if (wednesdayBacks < settings.max_backvocals_per_service) {
-      return `Quarta precisa ter ${settings.max_backvocals_per_service} backs.`;
-    }
-
-    const pendingAssignments = [
-      ...instrumentAssignments,
-      ...vocalAssignments,
-    ].some((assignment) => assignment.status === "pending");
-
-    if (pendingAssignments) {
-      return "Existem membros pendentes de confirmação.";
-    }
-
-    return null;
-  }
-
-  async function updateWeekStatus(status: string) {
-    if (!week) return;
-
-    if (permissions?.isGeneralLeader !== true) {
-      alert("Apenas o líder geral pode alterar o status da escala.");
-      return;
-    }
-
-    const { error } = await supabase
-      .from("ministry_weeks")
-      .update({ status })
-      .eq("id", week.id);
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    if (status === "published") {
-      const validationError = validateScaleBeforePublish();
-
-      if (validationError) {
-        alert(validationError);
-        return;
-      }
-    }
-
-    await loadWeekData();
-  }
   const isPublishedOrClosed =
     week.status === "published" || week.status === "closed";
 
@@ -595,92 +546,14 @@ export default function EscalaDetailsPage() {
 
   return (
     <AppLayout>
-      <div className="mb-8">
-        <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-600">
-          <CalendarDays size={24} />
-        </div>
+      <ScheduleHeader week={week} />
 
-        <h1 className="text-3xl font-bold">
-          Semana {formatDate(week.sunday_date)} a{" "}
-          {formatDate(week.wednesday_date)}
-        </h1>
-
-        <p className="mt-2 text-zinc-400">
-          Grupo vocal: {vocalGroupLabels[week.vocal_group] || week.vocal_group}
-        </p>
-
-        <p className="text-sm text-zinc-500">
-          Ensaio: {formatDate(week.rehearsal_date)}
-        </p>
-      </div>
-
-      <Card className="mb-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p className="text-sm text-zinc-500">Status da escala</p>
-
-            <h2 className="mt-1 text-xl font-semibold">
-              {weekStatusLabels[week.status] || week.status}
-            </h2>
-
-            {isPublishedOrClosed && (
-              <p className="mt-2 text-sm text-zinc-400">
-                Esta escala está publicada ou encerrada. As edições estão
-                bloqueadas.
-              </p>
-            )}
-          </div>
-
-          {permissions?.isGeneralLeader && (
-            <div className="flex flex-wrap gap-2">
-              {week.status === "draft" && (
-                <button
-                  onClick={() => updateWeekStatus("building")}
-                  className="rounded-xl bg-violet-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-violet-500"
-                >
-                  Iniciar montagem
-                </button>
-              )}
-
-              {week.status === "building" && (
-                <button
-                  onClick={() => updateWeekStatus("waiting_repertoire")}
-                  className="rounded-xl bg-violet-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-violet-500"
-                >
-                  Aguardar repertório
-                </button>
-              )}
-
-              {week.status === "waiting_repertoire" && (
-                <button
-                  onClick={() => updateWeekStatus("waiting_confirmations")}
-                  className="rounded-xl bg-violet-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-violet-500"
-                >
-                  Aguardar confirmações
-                </button>
-              )}
-
-              {week.status === "waiting_confirmations" && (
-                <button
-                  onClick={() => updateWeekStatus("published")}
-                  className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-emerald-500"
-                >
-                  Publicar escala
-                </button>
-              )}
-
-              {week.status === "published" && (
-                <button
-                  onClick={() => updateWeekStatus("closed")}
-                  className="rounded-xl bg-zinc-800 px-4 py-3 text-sm font-medium text-white transition hover:bg-zinc-700"
-                >
-                  Encerrar escala
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      </Card>
+      <ScheduleStatusCard
+        status={week.status}
+        isPublishedOrClosed={isPublishedOrClosed}
+        isGeneralLeader={permissions?.isGeneralLeader === true}
+        onChangeStatus={updateWeekStatus}
+      />
 
       <div className="grid gap-5 xl:grid-cols-2">
         <InstrumentAssignmentsCard
